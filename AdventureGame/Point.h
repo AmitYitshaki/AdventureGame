@@ -14,7 +14,6 @@ public:
 	void draw() const {
 		gotoxy(x, y);
 		cout << ch;
-		cout.flush();
 	}
 
 	void setpoint(int x1, int y1) {
@@ -27,6 +26,9 @@ public:
 	}
 	int getY() const {
 		return y;
+	}
+	char getChar() const {
+		return ch;
 	}
 
 	void move(int dx, int dy);

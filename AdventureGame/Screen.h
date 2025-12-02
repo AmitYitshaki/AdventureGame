@@ -8,6 +8,7 @@ public:
 	static constexpr int WIDTH = 80;
 	static constexpr int HEIGHT = 25;
 private:
+	ScreenId screenID;
 	const char* const* layout = nullptr; // Initialize to nullptr
 
 	// כאן נגדיר את כל ה-layouts
@@ -24,6 +25,16 @@ public:
 
 	bool isWall(const Point& p) const {
 		return layout[p.getY()][p.getX()] == '#';
+	}
+	ScreenId getScreenId() {
+		return screenID;
+	}
+
+	const char* getLine(int row) const {
+		if (row >= 0 && row < HEIGHT && layout != nullptr) {
+			return layout[row];
+		}
+		return "";
 	}
 };
 
