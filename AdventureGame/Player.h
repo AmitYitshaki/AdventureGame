@@ -2,10 +2,12 @@
 #include "Point.h"
 #include "Direction.h"
 #include "ScreenID.h"
+#include "Torch.h"
 #include <vector>
 
 class Screen;
 class GameObject;
+class Torch;
 
 class Player
 {
@@ -86,7 +88,6 @@ public:
 	void setFlying(bool canFly) {
 		flying = canFly;
 	}
-
 	bool isLoaded() const {
 		return loaded;
 	}
@@ -96,6 +97,7 @@ public:
 	void setLaunchDirection(Direction d) {
 		launchDirection = d;
 	}
+	
 
 	Direction getLaunchDirection() const {
 		return launchDirection;
@@ -112,6 +114,8 @@ public:
 	}
 
 	int getHeldKeyID() const;
+
+	bool hasTorch() const;
 
 	void launch(Direction d);
 

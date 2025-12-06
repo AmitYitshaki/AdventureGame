@@ -1,5 +1,4 @@
 ﻿#include "Screen.h"
-using namespace std;
 
 Screen::Screen() //defult ctor
 {
@@ -34,9 +33,9 @@ Screen::Screen(ScreenId screenID) : screenID(screenID)//screen paramter ctor
 void Screen::draw() const {
 	gotoxy(0, 0);
 	for (int i = 0; i < HEIGHT; ++i) {
-		cout << layout[i];
+		std::cout << layout[i];
 		if (i < HEIGHT - 1)
-			cout << '\n';
+			std::cout << '\n';
 	}
 }
 

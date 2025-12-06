@@ -43,7 +43,7 @@ void Game::drawObjectsToBuffer(std::vector<std::string>& buffer) {
     ScreenId currentId = currentScreen->getScreenId();
 
     for (auto obj : gameObjects) {
-        if (obj != nullptr)
+        if (obj == nullptr)
             continue;
         if (obj->getScreenId() == currentId) {
             
@@ -95,6 +95,7 @@ void Game::draw()
     drawObjectsToBuffer(buffer);
     drawPlayersToBuffer(buffer);
     drawStatusToBuffer(buffer);
+	applyLighting(buffer);
 
     // 3. Render to Screen
     renderBuffer(buffer);
@@ -237,6 +238,41 @@ void Game::stopMovement()
 {
     player1.setDirection(Direction::STAY);
     player2.setDirection(Direction::STAY);
+}
+
+void Game::applyLighting(std::vector<std::string>& buffer)
+{
+    if (!currentScreen->isDark())
+        return;
+	const int WIDTH = Screen::WIDTH;
+	const int HEIGHT = Screen::HEIGHT;
+
+	const int BASE_LIGHT_RADIUS = 3; // Minimum light radius
+	const int TORCH_LIGHT_RADIUS = 7; // Additional radius if player has torch
+
+    const int p1x = player1.getX();
+    const int p1y = player1.getY();
+    const int p2x = player2.getX();
+    const int p2y = player2.getY();
+
+    const int r1 = player1.hasTorch() ? TORCH_LIGHT_RADIUS : BASE_LIGHT_RADIUS;
+    const int r2 = player2.hasTorch() ? TORCH_LIGHT_RADIUS : BASE_LIGHT_RADIUS;
+    const int r1s = r1 * r1; // ריבוע רדיוס 1
+    const int r2s = r2 * r2; // ריבוע רדיוס 2
+
+    for (int y = 1; y < HEIGHT; ++y) {
+        for (int x = 0; x < WIDTH; ++x) {
+            int dx1 = x - p1x;
+            int dy1 = y - p1y;
+            int dx2 = x - p2x;
+            int dy2 = y - p2y;
+            int dist1s = dx1 * dx1 + dy1 * dy1; // ריבוע המרחק לשחקן 1
+            int dist2s = dx2 * dx2 + dy2 * dy2; // ריבוע המרחק לשחקן 2
+            if (dist1s > r1s && dist2s > r2s) {
+                buffer[y][x] = ' ';
+            }
+        }
+	}
 }
 
 void Game::setStatusMessage(const std::string& msg)

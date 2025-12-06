@@ -1,5 +1,4 @@
 #include "Point.h"
-using namespace std;
 
 
 void Point::move(int dx, int dy)

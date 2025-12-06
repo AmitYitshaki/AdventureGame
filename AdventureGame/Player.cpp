@@ -170,3 +170,11 @@ int Player::getHeldKeyID() const
     }
     return -1;
 } // לא מחזיק מפתח או מחזיק משהו אחר
+
+bool Player::hasTorch() const
+{
+    if (heldItem == nullptr)
+        return false;
+
+    return dynamic_cast<Torch*>(heldItem) != nullptr;
+}

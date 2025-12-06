@@ -10,6 +10,7 @@ public:
 private:
 	ScreenId screenID;
 	const char* const* layout = nullptr; // Initialize to nullptr
+	bool dark = false; 
 
 	// כאן נגדיר את כל ה-layouts
 	static const char* HOME_LAYOUT[HEIGHT];
@@ -29,6 +30,15 @@ public:
 	ScreenId getScreenId() {
 		return screenID;
 	}
+	
+	bool isDark() const {
+		return dark;
+	}
+
+	void setDark(bool isDark) {
+		dark = isDark;
+	}
+
 
 	const char* getLine(int row) const {
 		if (row >= 0 && row < HEIGHT && layout != nullptr) {

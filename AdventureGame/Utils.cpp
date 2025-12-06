@@ -1,12 +1,11 @@
 #include "Utils.h"
-using namespace std;
 
 
 void gotoxy(int x, int y) {
 	COORD coord;
 	coord.X = x;
 	coord.Y = y;
-	cout.flush();
+	std::cout.flush();
 	SetConsoleCursorPosition(GetStdHandle(STD_OUTPUT_HANDLE), coord);
 }
 

@@ -6,6 +6,7 @@
 #include "Key.h"
 #include "Door.h"
 #include "spring.h"
+#include "Torch.h"
 #include <vector>
 #include <string>
 
@@ -45,13 +46,14 @@ private:
 public:
 	// Constructor
 	Game()
-		: player1(2, 12, '$', 16), player2(3,12, '&', 36), isRunning(true)
+		: player1(2, 12, '$', 16), player2(3,12, '&', 33), isRunning(true)
 	{
 		// Initialize screens
 		screens[(int)ScreenId::HOME] = Screen(ScreenId::HOME);
 		screens[(int)ScreenId::INSTRUCTIONS] = Screen(ScreenId::INSTRUCTIONS);
 		screens[(int)ScreenId::ROOM1] = Screen(ScreenId::ROOM1);
 		screens[(int)ScreenId::ROOM2] = Screen(ScreenId::ROOM2);
+		screens[(int)ScreenId::ROOM2].setDark(true); // Make ROOM2 dark initially
 		screens[(int)ScreenId::ROOM3] = Screen(ScreenId::ROOM3);
 
 		currentScreen = &screens[(int)ScreenId::HOME];
@@ -59,11 +61,13 @@ public:
 		// Initialize objects (Keys and Doors)
 		// Note: Door location set to 78 to fit inside 0-79 bounds
 		gameObjects = {
+			new Key(10, 10, 'K', ScreenId::ROOM1, 1),
+			new Torch(15, 10, '!', ScreenId::ROOM1),
 			new Spring(Point(5,15, 'w'),Point(4,15, 'w'),Point(3,15, 'W'),Direction::RIGHT,ScreenId::ROOM1),
 			new Spring(Point(76,17, 'w'),Point(77,17,'w'),Point(78,17,'W'),Direction::LEFT,ScreenId::ROOM1),
-			new Key(10, 10, 'K', ScreenId::ROOM1, 1),
 			new Door(79, 12, '1', ScreenId::ROOM1, 1, ScreenId::ROOM2, true),
 			new Key(20, 15, 'K', ScreenId::ROOM2, 2),
+			new Torch(15, 10, '!', ScreenId::ROOM2),
 			new Door(79, 12, '2', ScreenId::ROOM2, 2, ScreenId::ROOM3, true)
 
 		};
@@ -88,6 +92,7 @@ public:
 	void goToScreen(ScreenId screenID) {
 		currentScreen = &screens[(int)screenID];
 	}
+	void applyLighting(std::vector<std::string>& buffer);
 
 	// --- Add this static method to your Game class declaration
 	static void setStatusMessage(const std::string& msg);
