@@ -16,13 +16,17 @@ private:
 	int hudY = 0;
 	int speed = 1;
 	int live = 3;
+	bool flying = false;
+	bool loaded = false;
+	Direction launchDirection = Direction::STAY;
 	GameObject* heldItem = nullptr;
 	ScreenId currentLevel = ScreenId::ROOM1;
+
 	
 
 public:
-	Player(int x, int y, char c,int HudPos) //member initializer list
-		: point(x, y, c), hudX(HudPos) {
+	Player(int x, int y, char c, int HudPos) //member initializer list
+		: point(x, y, c), hudX(HudPos), flying(flying) {
 	}
 
 	~Player();
@@ -30,6 +34,11 @@ public:
 	void draw() const
 	{
 		point.draw();
+	}
+	void drawNoSleep() const
+	{
+		point.drawNoSleep();
+		
 	}
 
 	//move functions:
@@ -49,7 +58,9 @@ public:
 	{
 		return point.getY();
 	}
-	void move(Screen& screen,vector<GameObject*>& gameObjects);
+	void move(Screen& screen,std::vector<GameObject*>& gameObjects);
+	void moveFlying(Screen& screen, std::vector<GameObject*>& gameObjects);
+	void launch();
 	Direction getDirection() const
 	{
 		return dir;
@@ -68,6 +79,27 @@ public:
 	{
 		return heldItem != nullptr;
 	}
+	bool isFlying() const
+	{
+		return flying;
+	}
+	void setFlying(bool canFly) {
+		flying = canFly;
+	}
+
+	bool isLoaded() const {
+		return loaded;
+	}
+	void setLoaded(bool isLoaded) {
+		loaded = isLoaded;
+	}
+	void setLaunchDirection(Direction d) {
+		launchDirection = d;
+	}
+
+	Direction getLaunchDirection() const {
+		return launchDirection;
+	}
 
 	bool collectItem(GameObject* item);
 
@@ -80,6 +112,8 @@ public:
 	}
 
 	int getHeldKeyID() const;
+
+	void launch(Direction d);
 
 	
 };

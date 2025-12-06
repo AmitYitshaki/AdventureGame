@@ -4,15 +4,15 @@
 #include <vector>
 #include <iostream>
 
-using namespace std;
+std::string Game::statusMessage = ""; // Initialize the static member
 
 // --- Helper Functions Implementation ---
 
 // 1. Initialize buffer from the current screen map
-vector<string> Game::initBuffer() {
-    vector<string> buffer;
+std::vector<std::string> Game::initBuffer() {
+    std::vector<std::string> buffer;
     for (int i = 0; i < Screen::HEIGHT; ++i) {
-        string line = currentScreen->getLine(i);
+        std::string line = currentScreen->getLine(i);
         // Ensure the line is exactly 80 chars wide
         if (line.length() < Screen::WIDTH) {
             line.resize(Screen::WIDTH, ' ');
@@ -23,7 +23,7 @@ vector<string> Game::initBuffer() {
 }
 
 // 2. Write a single character to the buffer safely
-void Game::writeToBuffer(vector<string>& buffer, int x, int y, char c) {
+void Game::writeToBuffer(std::vector<std::string>& buffer, int x, int y, char c) {
     if (y >= 0 && y < buffer.size()) {
         if (x >= 0 && x < buffer[y].size()) {
             buffer[y][x] = c;
@@ -32,25 +32,34 @@ void Game::writeToBuffer(vector<string>& buffer, int x, int y, char c) {
 }
 
 // 3. Write a string to the buffer
-void Game::writeTextToBuffer(vector<string>& buffer, int x, int y, const string& text) {
+void Game::writeTextToBuffer(std::vector<std::string>& buffer, int x, int y, const std::string& text) {
     for (size_t i = 0; i < text.length(); ++i) {
         writeToBuffer(buffer, x + (int)i, y, text[i]);
     }
 }
 
 // 4. Draw game objects (Keys, Doors, etc.)
-void Game::drawObjectsToBuffer(vector<string>& buffer) {
+void Game::drawObjectsToBuffer(std::vector<std::string>& buffer) {
     ScreenId currentId = currentScreen->getScreenId();
 
     for (auto obj : gameObjects) {
+        if (obj != nullptr)
+            continue;
         if (obj->getScreenId() == currentId) {
-            writeToBuffer(buffer, obj->getX(), obj->getY(), obj->getChar());
-			//if obj point is -1 -1 (removed from game) we don't draw it
+            
+            if (auto spring = dynamic_cast<Spring*>(obj)) {
+
+                spring->drawToBuffer(buffer);
+            }
+            else {
+                writeToBuffer(buffer, obj->getX(), obj->getY(), obj->getChar());
+                //if obj point is -1 -1 (removed from game) we don't draw it
+            }
         }
     }
 }
 // 5. Draw players
-void Game::drawPlayersToBuffer(vector<string>& buffer) {
+void Game::drawPlayersToBuffer(std::vector<std::string>& buffer) {
     if (currentScreen == &screens[(int)ScreenId::HOME] ||
         currentScreen == &screens[(int)ScreenId::INSTRUCTIONS]) {
         return;
@@ -60,19 +69,19 @@ void Game::drawPlayersToBuffer(vector<string>& buffer) {
 }
 
 // 6. Draw status message (HUD)
-void Game::drawStatusToBuffer(vector<string>& buffer) {
-    if (!massage.empty()) {
-        writeTextToBuffer(buffer, 45, 0, massage); // Adjusted X to 45 to fit nicely
+void Game::drawStatusToBuffer(std::vector<std::string>& buffer) {
+    if (!statusMessage.empty()) {
+        writeTextToBuffer(buffer, 45, 0, statusMessage); // Adjusted X to 45 to fit nicely
     }
 }
 
 // 7. Render the final buffer to the console
-void Game::renderBuffer(const vector<string>& buffer) {
+void Game::renderBuffer(const std::vector<std::string>& buffer) {
     gotoxy(0, 0);
     for (const auto& line : buffer) {
-        cout << line << '\n';
+        std::cout << line << '\n';
     }
-    cout.flush(); // Single flush for the entire frame
+    std::cout.flush(); // Single flush for the entire frame
 }
 
 // --- Main Game Functions ---
@@ -80,7 +89,7 @@ void Game::renderBuffer(const vector<string>& buffer) {
 void Game::draw()
 {
     // 1. Prepare Canvas
-    vector<string> buffer = initBuffer();
+    std::vector<std::string> buffer = initBuffer();
 
     // 2. Draw Layers
     drawObjectsToBuffer(buffer);
@@ -93,11 +102,24 @@ void Game::draw()
 
 void Game::update()
 {
-    player1.move(*currentScreen, gameObjects);
-    player2.move(*currentScreen, gameObjects);
+    int stepsP1 = player1.isFlying() ? 3 : 1; // כמה צעדים לעשות לשחקן 1
+    int stepsP2 = player2.isFlying() ? 3 : 1; // כמה צעדים לשחקן 2
 
-    // Check if level needs to change
-    checkLevelTransition();
+    for (int i = 0; i < stepsP1; ++i) {
+        player1.move(*currentScreen, gameObjects);
+    }
+
+    for (int i = 0; i < stepsP2; ++i) {
+        player2.move(*currentScreen, gameObjects);
+    }
+
+    if (currentScreen->getScreenId() != ScreenId::HOME &&
+        currentScreen->getScreenId() != ScreenId::INSTRUCTIONS)
+    {
+        checkLevelTransition();
+    }
+
+    checkIsPlayerLoaded();
 }
 
 void Game::handleInput()
@@ -107,7 +129,6 @@ void Game::handleInput()
         char key = _getch();
         if (currentScreen == &screens[(int)ScreenId::HOME] && key == '1') // Start new game
         {
-            resetPlayersForNewLevel(); // Reset positions for ROOM1 start
             goToScreen(ScreenId::ROOM1);
             return;
         }
@@ -131,6 +152,14 @@ void Game::handleInput()
             pauseScreen();
             return;
         }
+        else if (player1.isLoaded() && (key == 's' || key == 'S')) {
+            player1.launch();
+            return;
+		}
+        else if (player2.isLoaded() && (key == 'k' || key == 'K')) {
+			player2.launch();
+            return;
+		}
         else
         {
             ChangeDirection(key);
@@ -142,9 +171,8 @@ void Game::handleInput()
             else if (key == 'o' || key == 'O') {
                 GameObject* obj = player2.dropItemToScreen(currentScreen->getScreenId());
             }
-
-            return;
         }
+        return;
     }
 }
 
@@ -171,7 +199,7 @@ void Game::start() {
         handleInput();
         update();
         draw();
-        Sleep(250);
+        Sleep(240);
     }
     cls();
 }
@@ -181,11 +209,11 @@ void Game::pauseScreen()
     int x = (Screen::WIDTH - 37) / 2;
     int y = (Screen::HEIGHT - 5) / 2;
 
-    gotoxy(x, y);     cout << "*************************************";
-    gotoxy(x, y + 1); cout << "* Game Paused                       *";
-    gotoxy(x, y + 2); cout << "* Press ESC to continue             *";
-    gotoxy(x, y + 3); cout << "* Press H to open Home Screen       *";
-    gotoxy(x, y + 4); cout << "*************************************";
+    gotoxy(x, y);     std::cout << "*************************************";
+    gotoxy(x, y + 1); std::cout << "* Game Paused                       *";
+    gotoxy(x, y + 2); std::cout << "* Press ESC to continue             *";
+    gotoxy(x, y + 3); std::cout << "* Press H to open Home Screen       *";
+    gotoxy(x, y + 4); std::cout << "*************************************";
 
     while (true)
     {
@@ -211,6 +239,12 @@ void Game::stopMovement()
     player2.setDirection(Direction::STAY);
 }
 
+void Game::setStatusMessage(const std::string& msg)
+{
+    statusMessage = msg;
+}
+
+
 void Game::resetPlayersForNewLevel()
 {
     player1.updatepoint(2, 12);
@@ -218,7 +252,7 @@ void Game::resetPlayersForNewLevel()
     player1.setDirection(Direction::STAY);
     player2.setDirection(Direction::STAY);
 
-    // Sync logical level
+    // Sync logical level (allready done before but good to make sure
     ScreenId currentId = currentScreen->getScreenId();
     player1.setCurrentLevel(currentId);
     player2.setCurrentLevel(currentId);
@@ -252,6 +286,13 @@ void Game::checkLevelTransition()
         setStatusMessage("");
     }
 }
+void Game::checkIsPlayerLoaded()
+{
+    if (player1.isLoaded() || player2.isLoaded()) {
+		setStatusMessage("Spring ready!Press STAY key to launch");  
+    }
+}
+
 
 Game::~Game()
 {

@@ -1,6 +1,5 @@
 #pragma once
 #include "Utils.h"
-using namespace std;
 
 
 class Point {
@@ -13,7 +12,13 @@ public:
 
 	void draw() const {
 		gotoxy(x, y);
-		cout << ch;
+		std::cout << ch;
+	}
+
+	void drawNoSleep() const {
+		gotoxy(x, y);
+		std::cout << ch;
+		std::cout.flush();
 	}
 
 	void setpoint(int x1, int y1) {

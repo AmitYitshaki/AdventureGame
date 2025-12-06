@@ -5,7 +5,6 @@
 #include "Key.h"
 #include "Door.h"
 
-using namespace std;
 
 Player::~Player() {
     if (heldItem != nullptr) {
@@ -13,45 +12,111 @@ Player::~Player() {
     }
 }
 
-void Player::move(Screen& screen, vector<GameObject*>& gameObjects) {
+void Player::move(Screen& screen, std::vector<GameObject*>& gameObjects) {
+
+    if (isFlying())
+    {
+        moveFlying(screen, gameObjects);
+        return;
+    }
+    
     int dx = 0, dy = 0;
 
     switch (dir) {
-    case Direction::UP: dy = -1; break;
-    case Direction::DOWN: dy = 1; break;
-    case Direction::LEFT: dx = -1; break;
-    case Direction::RIGHT: dx = 1; break;
+    case Direction::UP: dy = -1; dx = 0; break;
+    case Direction::DOWN: dy = 1; dx = 0; break;
+    case Direction::LEFT: dx = -1; dy = 0; break;
+    case Direction::RIGHT: dx = 1; dy = 0; break;
     case Direction::STAY: return;
     }
 
-    Point next(point.getX() + dx * speed, point.getY() + dy * speed, ' ');
+    Point next(point.getX() + dx, point.getY() + dy, ' ');
 
     if (screen.isWall(next)) {
         stopMovement();
         return;
     }
-    point.move(dx * speed, dy * speed);
+
+    point.move(dx,dy);
 
     ScreenId currentScreenId = screen.getScreenId();
     int playerX = point.getX();
     int playerY = point.getY();
 
     for (auto obj : gameObjects) {
+        if (obj->getScreenId() != currentScreenId)
+			continue; // Skip objects not in the current screen
         int objX = obj->getX();
         int objY = obj->getY();
-        if (playerX == objX && playerY == objY &&
-            obj->getScreenId() == currentScreenId &&
-            !obj->getIsCollected())
-        {
-			bool allowed = obj->handleCollision(*this, screen, gameObjects);
+        if (playerX == objX && playerY == objY && !obj->getIsCollected())
+            {
+			bool allowed = obj->handleCollision(*this, screen);
             if (!allowed) {
-				point.move(-dx * speed, -dy * speed);
-				dir = Direction::STAY;
+                point.move(-dx * speed, -dy * speed);
+                dir = Direction::STAY;
+                }
+            }
+        }
+    }
+
+void Player::moveFlying(Screen& screen, std::vector<GameObject*>& gameObjects)
+{
+    int dx = 0, dy = 0;
+
+    // כיוון בסיס מהקפיץ
+    switch (launchDirection) {
+    case Direction::UP:    dy = -1; break;
+    case Direction::DOWN:  dy = 1;  break;
+    case Direction::LEFT:  dx = -1; break;
+    case Direction::RIGHT: dx = 1;  break;
+    default: return;
+    }
+
+    // סטייה אנכית לפי dir
+    if (dir == Direction::UP)        dy -= 1;
+    else if (dir == Direction::DOWN) dy += 1;
+
+    Point next(point.getX() + dx, point.getY() + dy, ' ');
+
+    if (screen.isWall(next)) {
+        flying = false;
+        speed = 1;
+        launchDirection = Direction::STAY;
+        dir = Direction::STAY;
+        return;
+    }
+
+    point.move(dx, dy);
+
+    ScreenId currentScreenId = screen.getScreenId();
+    int playerX = point.getX();
+    int playerY = point.getY();
+
+    for (auto obj : gameObjects) {
+        if (obj->getScreenId() != currentScreenId)
+            continue;
+
+        if (playerX == obj->getX() && playerY == obj->getY() && !obj->getIsCollected()) {
+            bool allowed = obj->handleCollision(*this, screen);
+            if (!allowed) {
+                point.move(-dx, -dy);
+                flying = false;
+                speed = 1;
+                launchDirection = Direction::STAY;
+                dir = Direction::STAY;
                 return;
             }
         }
     }
 }
+
+void Player::launch()
+{
+	setFlying(true);
+	dir = launchDirection;
+    setLoaded(false);
+}
+
 
 bool Player::collectItem(GameObject* item)
 {

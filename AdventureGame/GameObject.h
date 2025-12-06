@@ -31,7 +31,7 @@ public:
 
 	// Logic for collision with player. 
 	// Returns true if player can move into this spot, false if blocked.
-	virtual bool handleCollision(Player& p, const Screen& screen, std::vector<GameObject*>& objects);
+	virtual bool handleCollision(Player& p, const Screen& screen);
 
 	// --- Inventory Management Functions ---
 

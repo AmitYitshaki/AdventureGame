@@ -1,10 +1,11 @@
-#pragma once
+﻿#pragma once
 #include "Player.h"
 #include "Screen.h"
 #include "ScreenID.h"
 #include "GameObject.h"
 #include "Key.h"
 #include "Door.h"
+#include "spring.h"
 #include <vector>
 #include <string>
 
@@ -19,12 +20,14 @@ private:
 	// Vector to hold all game objects
 	std::vector<GameObject*> gameObjects;
 
-	std::string massage = "";
+	std::string message = "";
 	bool isRunning;
 
 	// --- Private Helper Functions (Logic) ---
 	void resetPlayersForNewLevel();
 	void checkLevelTransition();
+
+	void checkIsPlayerFlaying();
 
 	// --- Private Helper Functions (Double Buffering / Draw) ---
 	std::vector<std::string> initBuffer();
@@ -35,6 +38,9 @@ private:
 	void drawPlayersToBuffer(std::vector<std::string>& buffer);
 	void drawStatusToBuffer(std::vector<std::string>& buffer);
 	void renderBuffer(const std::vector<std::string>& buffer);
+
+	// Add a static variable to hold the status message
+	static std::string statusMessage;
 
 public:
 	// Constructor
@@ -53,10 +59,13 @@ public:
 		// Initialize objects (Keys and Doors)
 		// Note: Door location set to 78 to fit inside 0-79 bounds
 		gameObjects = {
+			new Spring(Point(5,15, 'w'),Point(4,15, 'w'),Point(3,15, 'W'),Direction::RIGHT,ScreenId::ROOM1),
+			new Spring(Point(76,17, 'w'),Point(77,17,'w'),Point(78,17,'W'),Direction::LEFT,ScreenId::ROOM1),
 			new Key(10, 10, 'K', ScreenId::ROOM1, 1),
 			new Door(79, 12, '1', ScreenId::ROOM1, 1, ScreenId::ROOM2, true),
 			new Key(20, 15, 'K', ScreenId::ROOM2, 2),
 			new Door(79, 12, '2', ScreenId::ROOM2, 2, ScreenId::ROOM3, true)
+
 		};
 	}
 
@@ -74,12 +83,12 @@ public:
 	void start();
 	void pauseScreen();
 	void stopMovement();
+	void checkIsPlayerLoaded();
 
 	void goToScreen(ScreenId screenID) {
 		currentScreen = &screens[(int)screenID];
 	}
 
-	void setStatusMessage(const std::string& msg) {
-		massage = msg;
-	}
+	// --- Add this static method to your Game class declaration
+	static void setStatusMessage(const std::string& msg);
 };

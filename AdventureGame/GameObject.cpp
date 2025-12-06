@@ -15,7 +15,7 @@ void GameObject::removeFromGame()
 	setPosition(-1, -1);
 }
 
-bool GameObject::handleCollision(Player& p, const Screen& screen, std::vector<GameObject*>& objects)
+bool GameObject::handleCollision(Player& p, const Screen& screen)
 {
 	// Case 1: Non-solid object (e.g., Key, Bomb) -> Walk through & Collect
 	if (!isSolid())

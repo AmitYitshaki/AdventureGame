@@ -1,6 +1,5 @@
 #pragma once
-class HomeScreen
+class Torch
 {
-
 };
 

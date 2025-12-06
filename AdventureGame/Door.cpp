@@ -18,7 +18,7 @@ bool Door::unlock(Player& player) {
 	}
 	return false; // Failed to unlock
 }
-bool Door::handleCollision(Player& p, const Screen& screen, std::vector<GameObject*>& objects)
+bool Door::handleCollision(Player& p, const Screen& screen)
 {
     if (!isLocked())
     {

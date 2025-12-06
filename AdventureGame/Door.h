@@ -19,6 +19,6 @@ public:
 		return leadsTo;
 	}
 	bool unlock(Player& player); // Attempt to unlock the door with the player's key
-	bool handleCollision(Player& p, const Screen& screen, std::vector<GameObject*>& objects);
+	bool handleCollision(Player& p, const Screen& screen);
 };
 
