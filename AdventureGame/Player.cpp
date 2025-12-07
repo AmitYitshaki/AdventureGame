@@ -3,6 +3,8 @@
 #include <vector>
 #include "GameObject.h"
 #include "Key.h"
+#include "Torch.h"
+#include "Riddle.h"
 #include "Door.h"
 
 
@@ -48,7 +50,7 @@ void Player::move(Screen& screen, std::vector<GameObject*>& gameObjects) {
 			continue; // Skip objects not in the current screen
         int objX = obj->getX();
         int objY = obj->getY();
-        if (playerX == objX && playerY == objY && !obj->getIsCollected())
+        if (playerX == objX && playerY == objY && !obj->isCollected())
             {
 			bool allowed = obj->handleCollision(*this, screen);
             if (!allowed) {
@@ -96,7 +98,7 @@ void Player::moveFlying(Screen& screen, std::vector<GameObject*>& gameObjects)
         if (obj->getScreenId() != currentScreenId)
             continue;
 
-        if (playerX == obj->getX() && playerY == obj->getY() && !obj->getIsCollected()) {
+        if (playerX == obj->getX() && playerY == obj->getY() && !obj->isCollected()) {
             bool allowed = obj->handleCollision(*this, screen);
             if (!allowed) {
                 point.move(-dx, -dy);
@@ -177,4 +179,24 @@ bool Player::hasTorch() const
         return false;
 
     return dynamic_cast<Torch*>(heldItem) != nullptr;
+}
+
+bool Player::hasRiddle() const
+{
+    if (heldItem == nullptr)
+        return false;
+
+    return dynamic_cast<Riddle*>(heldItem) != nullptr;
+}
+
+Riddle* Player::getHeldRiddle() const
+{
+    if(hasRiddle())
+		return dynamic_cast<Riddle*>(heldItem);
+	return nullptr;
+}
+
+void Player::decreaseLife() {
+    if (live > 0)
+        live--;
 }

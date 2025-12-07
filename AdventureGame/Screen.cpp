@@ -100,7 +100,7 @@ const char* Screen::INSTRUCTIONS_LAYOUT[HEIGHT] = {
 
 const char* Screen::ROOM1_LAYOUT[HEIGHT] = {
    //01234567890123456789012345678901234567890123456789012345678901234567890123456789
-	"p1 Lives: Item:   p2 Lives: Item:  room:1                                       ",
+	"p1 Lives:  Item:   p2 Lives:  Item:  room:1                                     ",
 	"################################################################################",
 	"#                                                                              #",
 	"#                                                                              #",
@@ -129,7 +129,7 @@ const char* Screen::ROOM1_LAYOUT[HEIGHT] = {
 
 const char* Screen::ROOM2_LAYOUT[HEIGHT] = {
    //01234567890123456789012345678901234567890123456789012345678901234567890123456789
-	"p1 Lives: Item:   p2 Lives: Item:  room:2                                       ",
+	"p1 Lives:  Item:   p2 Lives:  Item:  room:2                                     ",
 	"################################################################################",
 	"#                                               #                              #",
 	"#                   ###########       ###########                              #",
@@ -157,7 +157,7 @@ const char* Screen::ROOM2_LAYOUT[HEIGHT] = {
 };
 
 const char* Screen::ROOM3_LAYOUT[HEIGHT] = {
-	"p1 Lives: Item:   p2 Lives: Item:  room:3                                      ",
+	"p1 Lives:  Item:   p2 Lives:  Item:  room:3                                    ",
 	"###############################################################################",
 	"#                                                                             #",
 	"#        #########                                                            #",

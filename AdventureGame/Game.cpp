@@ -1,4 +1,5 @@
 ﻿#include "Game.h"
+#include "Riddle.h"
 #include <conio.h>
 #include <string> 
 #include <vector>
@@ -66,6 +67,8 @@ void Game::drawPlayersToBuffer(std::vector<std::string>& buffer) {
     }
     writeToBuffer(buffer, player1.getX(), player1.getY(), player1.getChar());
     writeToBuffer(buffer, player2.getX(), player2.getY(), player2.getChar());
+    writeToBuffer(buffer, player1.getHudX()-7, player1.getHudY(), player1.getLive()+'0');
+    writeToBuffer(buffer, player2.getHudX() - 7, player2.getHudY(), player2.getLive()+'0');
 }
 
 // 6. Draw status message (HUD)
@@ -74,6 +77,37 @@ void Game::drawStatusToBuffer(std::vector<std::string>& buffer) {
         writeTextToBuffer(buffer, 45, 0, statusMessage); // Adjusted X to 45 to fit nicely
     }
 }
+
+void Game::drawRiddle(std::vector<std::string>& buffer)
+{
+    if (!currentRiddle)
+        return;
+
+    const int boxW = Riddle::WIDTH;
+    const int boxH = Riddle::HEIGHT;
+
+    // נרכז את התיבה באמצע המסך
+    int startX = (Screen::WIDTH - boxW) / 2;
+    int startY = (Screen::HEIGHT - boxH) / 2;
+
+    for (int y = 0; y < boxH; ++y) {
+        const char* line = currentRiddle->getLine(y);
+        if (!line)
+            continue;
+
+        for (int x = 0; x < boxW && line[x] != '\0'; ++x) {
+            int bx = startX + x;
+            int by = startY + y;
+
+            if (by >= 0 && by < Screen::HEIGHT &&
+                bx >= 0 && bx < Screen::WIDTH)
+            {
+                buffer[by][bx] = line[x];
+            }
+        }
+    }
+}
+
 
 // 7. Render the final buffer to the console
 void Game::renderBuffer(const std::vector<std::string>& buffer) {
@@ -96,6 +130,11 @@ void Game::draw()
     drawPlayersToBuffer(buffer);
     drawStatusToBuffer(buffer);
 	applyLighting(buffer);
+
+    if (RiddleMode && currentRiddle) {
+        drawRiddle(buffer);
+    }
+
 
     // 3. Render to Screen
     renderBuffer(buffer);
@@ -121,14 +160,32 @@ void Game::update()
     }
 
     checkIsPlayerLoaded();
+    checkIsPlayerLoaded();
+
+    if (!RiddleMode && checkPlayerHasRiddle()) {
+        if (player1.hasRiddle()) {
+            currentRiddle = player1.getHeldRiddle();
+            startRiddle(currentRiddle, player1);
+        }
+        else if (player2.hasRiddle()) {
+            currentRiddle = player2.getHeldRiddle();
+            startRiddle(currentRiddle, player2);
+        }
+    }
 }
+
 
 void Game::handleInput()
 {
     if (_kbhit())
     {
         char key = _getch();
-        if (currentScreen == &screens[(int)ScreenId::HOME] && key == '1') // Start new game
+
+        if (RiddleMode && currentRiddle) {
+            handleRiddleInput(key);
+            return;
+        }
+        else if(currentScreen == &screens[(int)ScreenId::HOME] && key == '1') // Start new game
         {
             goToScreen(ScreenId::ROOM1);
             return;
@@ -294,8 +351,27 @@ void Game::resetPlayersForNewLevel()
     player2.setCurrentLevel(currentId);
 }
 
+void Game::startRiddle(Riddle* riddle, Player& p)
+{
+    if (!riddle)
+        return;
+
+    currentRiddle = riddle;
+    currentRiddlePlayer = &p;
+    RiddleMode = true;
+
+    stopMovement();
+    setStatusMessage("Riddle time! Press 1-4 to answer.");
+}
+
+
+
+
+bool Game::checkPlayerHasRiddle(){return player1.hasRiddle() || player2.hasRiddle();}
+
 void Game::checkLevelTransition()
 {
+
     ScreenId target1 = player1.getCurrentLevel();
     ScreenId target2 = player2.getCurrentLevel();
     ScreenId currentRealLevel = currentScreen->getScreenId();
@@ -306,9 +382,6 @@ void Game::checkLevelTransition()
     }
     else if (target2 != currentRealLevel && target1 == currentRealLevel) {
         setStatusMessage("Player 2 is waiting...");
-    }
-    else {
-        setStatusMessage("");
     }
 
     // Check if both are ready to transition
@@ -328,6 +401,54 @@ void Game::checkIsPlayerLoaded()
 		setStatusMessage("Spring ready!Press STAY key to launch");  
     }
 }
+void Game::handleRiddleInput(char key)
+{
+    if (!currentRiddle || !currentRiddlePlayer)
+        return;
+
+    int choice = -1;
+    if (key >= '1' && key <= '4') {
+        choice = key - '0'; // '1' → 1, '2' → 2 ...
+    }
+    else {
+        setStatusMessage("Press an option 1-4");
+        return; // Ignore other keys
+    }
+
+    Player& p = *currentRiddlePlayer;  // This is the correct player
+
+    if (choice == currentRiddle->getCorrectAnswer()) {
+        // Correct answer
+        setStatusMessage("Correct! You may continue.");
+
+        // Remove riddle from player's inventory
+        p.removeHeldItem();
+
+        // Exit riddle mode
+        RiddleMode = false;
+        currentRiddle = nullptr;
+        currentRiddlePlayer = nullptr;
+    }
+    else {
+        // Wrong answer → decrease life for the correct player
+        p.decreaseLife();
+        setStatusMessage("Wrong! You lost a life. Try again.");
+        draw();
+		Sleep(1000); // Pause to show message
+
+
+        if (p.getLive() <= 0) {
+            // Player has no lives left
+            RiddleMode = false;
+            currentRiddle = nullptr;
+            currentRiddlePlayer = nullptr;
+            // TODO: game over logic can be added here
+        }
+        // If player is still alive → remain in RiddleMode,
+        // wait for the next key press.
+    }
+}
+
 
 
 Game::~Game()

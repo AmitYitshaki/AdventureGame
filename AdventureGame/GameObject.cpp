@@ -21,7 +21,7 @@ bool GameObject::handleCollision(Player& p, const Screen& screen)
 	if (!isSolid())
 	{
 		// Only collect if it's not already in inventory
-		if (!getIsCollected()) {
+		if (!isCollected()) {
 			p.collectItem(this);
 		}
 		return true; // Allow movement

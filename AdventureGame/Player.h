@@ -9,6 +9,8 @@ class Screen;
 class GameObject;
 class Torch;
 
+class Riddle; // Forward declaration
+
 class Player
 {
 private:
@@ -28,7 +30,7 @@ private:
 
 public:
 	Player(int x, int y, char c, int HudPos) //member initializer list
-		: point(x, y, c), hudX(HudPos), flying(flying) {
+		: point(x, y, c), hudX(HudPos), flying(false) {
 	}
 
 	~Player();
@@ -97,7 +99,13 @@ public:
 	void setLaunchDirection(Direction d) {
 		launchDirection = d;
 	}
-	
+	void decreaseLife(); 
+	int getHudX() const {
+		return hudX;
+	}
+	int getHudY() const {
+		return hudY;
+	}
 
 	Direction getLaunchDirection() const {
 		return launchDirection;
@@ -117,6 +125,11 @@ public:
 
 	bool hasTorch() const;
 
+	bool hasRiddle() const;
+	Riddle* getHeldRiddle() const;
+	int getLive() const {
+		return live;
+	}
 	void launch(Direction d);
 
 	

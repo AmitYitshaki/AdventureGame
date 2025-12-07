@@ -9,6 +9,7 @@
 #include "Torch.h"
 #include <vector>
 #include <string>
+#include "Riddle.h"
 
 class Game
 {
@@ -18,17 +19,20 @@ private:
 	Screen screens[(int)ScreenId::NumOfScreens];
 	Screen* currentScreen;
 
+
 	// Vector to hold all game objects
 	std::vector<GameObject*> gameObjects;
 
-	std::string message = "";
+	
 	bool isRunning;
+	bool RiddleMode = false;
+	Riddle* currentRiddle = nullptr;
+	Player* currentRiddlePlayer = nullptr;
+	static std::string statusMessage;
 
 	// --- Private Helper Functions (Logic) ---
 	void resetPlayersForNewLevel();
 	void checkLevelTransition();
-
-	void checkIsPlayerFlaying();
 
 	// --- Private Helper Functions (Double Buffering / Draw) ---
 	std::vector<std::string> initBuffer();
@@ -38,10 +42,10 @@ private:
 	void drawObjectsToBuffer(std::vector<std::string>& buffer);
 	void drawPlayersToBuffer(std::vector<std::string>& buffer);
 	void drawStatusToBuffer(std::vector<std::string>& buffer);
+	void drawRiddle(std::vector<std::string>& buffer);
 	void renderBuffer(const std::vector<std::string>& buffer);
 
-	// Add a static variable to hold the status message
-	static std::string statusMessage;
+
 
 public:
 	// Constructor
@@ -63,12 +67,14 @@ public:
 		gameObjects = {
 			new Key(10, 10, 'K', ScreenId::ROOM1, 1),
 			new Torch(15, 10, '!', ScreenId::ROOM1),
+			new Riddle(30, 5, ScreenId::ROOM1, RiddleId::RIDDLE1),
 			new Spring(Point(5,15, 'w'),Point(4,15, 'w'),Point(3,15, 'W'),Direction::RIGHT,ScreenId::ROOM1),
 			new Spring(Point(76,17, 'w'),Point(77,17,'w'),Point(78,17,'W'),Direction::LEFT,ScreenId::ROOM1),
 			new Door(79, 12, '1', ScreenId::ROOM1, 1, ScreenId::ROOM2, true),
 			new Key(20, 15, 'K', ScreenId::ROOM2, 2),
 			new Torch(15, 10, '!', ScreenId::ROOM2),
 			new Door(79, 12, '2', ScreenId::ROOM2, 2, ScreenId::ROOM3, true)
+			
 
 		};
 	}
@@ -88,11 +94,17 @@ public:
 	void pauseScreen();
 	void stopMovement();
 	void checkIsPlayerLoaded();
+	void handleRiddleInput(char key);
 
 	void goToScreen(ScreenId screenID) {
 		currentScreen = &screens[(int)screenID];
 	}
 	void applyLighting(std::vector<std::string>& buffer);
+	bool isRiddleMode() const {return RiddleMode;}
+	void setRiddleMode(bool mode) { RiddleMode = mode;}
+	void startRiddle(Riddle* riddle , Player& p);
+
+	bool checkPlayerHasRiddle(); 
 
 	// --- Add this static method to your Game class declaration
 	static void setStatusMessage(const std::string& msg);

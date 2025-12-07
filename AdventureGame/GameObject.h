@@ -40,6 +40,7 @@ public:
 		collected = true;
 	}
 
+
 	// Updates state when dropped by player
 	virtual void drop() {
 		collected = false;
@@ -62,9 +63,7 @@ public:
 		return collected;
 	}
 	// Redundant getter (kept for compatibility with existing code)
-	virtual bool getIsCollected() const {
-		return collected;
-	}
+	
 
 	virtual void draw() const
 	{
