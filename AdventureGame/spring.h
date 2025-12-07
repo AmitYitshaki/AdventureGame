@@ -12,6 +12,8 @@ private:
     Point middle;
     Point end;
 	Direction direction;//to wich direction the spring will throw the player
+
+    void loadSpring(Player& p);
 public:
     // --- Constructor ---
     // startPt/midPt/endPt – הנקודות של הקפיץ על המסך
@@ -28,8 +30,7 @@ public:
         middle(middlePt),
         end(endPt),
         direction(dir)
-    {
-    }
+    {}
 
     // --- Getters ---
     const Point& getStart()  const { return start; }
@@ -40,6 +41,7 @@ public:
     // ציור של שלושת החלקים לבאפר (נשתמש בזה מתוך Game::drawObjectsToBuffer)
     void drawToBuffer(std::vector<std::string>& buffer) const;
 
-    void loadSpring(Player& p);
-    bool handleCollision(Player& p, const Screen& screen);
+    virtual bool isAtPosition(int x, int y) const override;
+    virtual bool handleCollision(Player& p, const Screen& screen) override;
+    static Direction oppositeDirection(Direction d);
 };

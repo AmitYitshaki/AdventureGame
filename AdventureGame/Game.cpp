@@ -160,7 +160,6 @@ void Game::update()
     }
 
     checkIsPlayerLoaded();
-    checkIsPlayerLoaded();
 
     if (!RiddleMode && checkPlayerHasRiddle()) {
         if (player1.hasRiddle()) {
@@ -212,10 +211,12 @@ void Game::handleInput()
         }
         else if (player1.isLoaded() && (key == 's' || key == 'S')) {
             player1.launch();
+			setStatusMessage("");
             return;
 		}
         else if (player2.isLoaded() && (key == 'k' || key == 'K')) {
 			player2.launch();
+            setStatusMessage("");
             return;
 		}
         else
@@ -285,6 +286,7 @@ void Game::pauseScreen()
             else if (key == 'H' || key == 'h') // H or h key
             {
                 goToScreen(ScreenId::HOME);
+				setStatusMessage("");
                 return;
             }
         }
@@ -398,7 +400,7 @@ void Game::checkLevelTransition()
 void Game::checkIsPlayerLoaded()
 {
     if (player1.isLoaded() || player2.isLoaded()) {
-		setStatusMessage("Spring ready!Press STAY key to launch");  
+		setStatusMessage("Spring ready!Press STAY to launch");  
     }
 }
 void Game::handleRiddleInput(char key)

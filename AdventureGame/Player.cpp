@@ -6,6 +6,7 @@
 #include "Torch.h"
 #include "Riddle.h"
 #include "Door.h"
+#include "Game.h"
 
 
 Player::~Player() {
@@ -44,22 +45,22 @@ void Player::move(Screen& screen, std::vector<GameObject*>& gameObjects) {
     ScreenId currentScreenId = screen.getScreenId();
     int playerX = point.getX();
     int playerY = point.getY();
-
     for (auto obj : gameObjects) {
         if (obj->getScreenId() != currentScreenId)
-			continue; // Skip objects not in the current screen
-        int objX = obj->getX();
-        int objY = obj->getY();
-        if (playerX == objX && playerY == objY && !obj->isCollected())
-            {
-			bool allowed = obj->handleCollision(*this, screen);
+            continue;
+
+        if (obj->isAtPosition(playerX, playerY) && !obj->isCollected())
+        {
+            bool allowed = obj->handleCollision(*this, screen);
             if (!allowed) {
                 point.move(-dx * speed, -dy * speed);
                 dir = Direction::STAY;
-                }
             }
         }
     }
+}
+
+
 
 void Player::moveFlying(Screen& screen, std::vector<GameObject*>& gameObjects)
 {
@@ -98,7 +99,7 @@ void Player::moveFlying(Screen& screen, std::vector<GameObject*>& gameObjects)
         if (obj->getScreenId() != currentScreenId)
             continue;
 
-        if (playerX == obj->getX() && playerY == obj->getY() && !obj->isCollected()) {
+        if (obj->isAtPosition(playerX, playerY) && !obj->isCollected()) {
             bool allowed = obj->handleCollision(*this, screen);
             if (!allowed) {
                 point.move(-dx, -dy);
@@ -114,8 +115,8 @@ void Player::moveFlying(Screen& screen, std::vector<GameObject*>& gameObjects)
 
 void Player::launch()
 {
+    dir = launchDirection;
 	setFlying(true);
-	dir = launchDirection;
     setLoaded(false);
 }
 
@@ -127,6 +128,7 @@ bool Player::collectItem(GameObject* item)
         heldItem = item;
         item->Collected();
 		item->setPosition(hudX, hudY);
+        Game::setStatusMessage(std::string("Collected item '") + item->getChar() + "'");
         return true;
 	}
     return false;
@@ -147,6 +149,8 @@ GameObject* Player::dropItemToScreen(ScreenId currentScreenID)
         // 3. החפץ מסומן כ"לא בתיק"
         itemToDrop->drop();
 
+        Game::setStatusMessage(std::string("Dropped item '") + itemToDrop->getChar() + "'");
+      
         // 4. ניתוק מהשחקן
         heldItem = nullptr;
 

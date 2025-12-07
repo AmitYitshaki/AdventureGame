@@ -65,14 +65,15 @@ public:
 		// Initialize objects (Keys and Doors)
 		// Note: Door location set to 78 to fit inside 0-79 bounds
 		gameObjects = {
-			new Key(10, 10, 'K', ScreenId::ROOM1, 1),
-			new Torch(15, 10, '!', ScreenId::ROOM1),
+			new Key(15, 20, 'K', ScreenId::ROOM1, 1),
 			new Riddle(30, 5, ScreenId::ROOM1, RiddleId::RIDDLE1),
-			new Spring(Point(5,15, 'w'),Point(4,15, 'w'),Point(3,15, 'W'),Direction::RIGHT,ScreenId::ROOM1),
+			new Spring(Point(4,15, 'w'),Point(3,15, 'w'),Point(2,15, 'W'),Direction::RIGHT,ScreenId::ROOM1),
 			new Spring(Point(76,17, 'w'),Point(77,17,'w'),Point(78,17,'W'),Direction::LEFT,ScreenId::ROOM1),
 			new Door(79, 12, '1', ScreenId::ROOM1, 1, ScreenId::ROOM2, true),
 			new Key(20, 15, 'K', ScreenId::ROOM2, 2),
 			new Torch(15, 10, '!', ScreenId::ROOM2),
+			new Torch(14, 10, '!', ScreenId::ROOM2),
+			new Riddle(77, 12, ScreenId::ROOM2, RiddleId::RIDDLE2),
 			new Door(79, 12, '2', ScreenId::ROOM2, 2, ScreenId::ROOM3, true)
 			
 
@@ -105,7 +106,5 @@ public:
 	void startRiddle(Riddle* riddle , Player& p);
 
 	bool checkPlayerHasRiddle(); 
-
-	// --- Add this static method to your Game class declaration
 	static void setStatusMessage(const std::string& msg);
 };

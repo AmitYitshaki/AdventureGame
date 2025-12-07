@@ -106,4 +106,8 @@ public:
 	void setScreenId(ScreenId newID) {
 		screenID = newID;
 	}
+
+	virtual bool isAtPosition(int x, int y) const {
+		return (x == point.getX() && y == point.getY());
+	}
 };

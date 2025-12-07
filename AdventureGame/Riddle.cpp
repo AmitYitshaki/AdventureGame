@@ -7,7 +7,7 @@ Riddle::Riddle()
     : GameObject(2, 2, '?', ScreenId::ROOM1),
     id(RiddleId::RIDDLE1),
     layout(RIDDLE1),
-    correctAnswer(1),  // UB
+    correctAnswer(1),  
     solved(false)
 {
 }
@@ -23,7 +23,7 @@ Riddle::Riddle(int x, int y, ScreenId screen, RiddleId id)
     {
     case RiddleId::RIDDLE1:
         layout = RIDDLE1;
-        correctAnswer = 1;  // Undefined behavior
+        correctAnswer = 1;  
         break;
 
     case RiddleId::RIDDLE2:
@@ -51,7 +51,9 @@ bool Riddle::handleCollision(Player& p, const Screen& screen)
     if (isCollected())
         return true;
 
-    // Add riddle to player's inventory
+    if (p.hasItem())
+		return false; // block if player already has an item
+
     p.collectItem(this);
 
     // Mark it as collected and remove from map
