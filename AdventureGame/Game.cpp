@@ -147,11 +147,24 @@ void Game::update()
 
     for (int i = 0; i < stepsP1; ++i) {
         player1.move(*currentScreen, gameObjects);
+        if (!player1.isFlying())
+            break;
     }
 
     for (int i = 0; i < stepsP2; ++i) {
         player2.move(*currentScreen, gameObjects);
+        if (!player2.isFlying())
+            break;
     }
+
+    if (player1.isFlying()) {
+        player1.updateSpringEffect();  // יוריד 1 מ-springTicksLeft, יעצור כשמגיע ל-0
+    }
+
+    if (player2.isFlying()) {
+        player2.updateSpringEffect();
+    }
+
 
     if (currentScreen->getScreenId() != ScreenId::HOME &&
         currentScreen->getScreenId() != ScreenId::INSTRUCTIONS)
@@ -210,12 +223,12 @@ void Game::handleInput()
             return;
         }
         else if (player1.isLoaded() && (key == 's' || key == 'S')) {
-            player1.launch();
+            player1.launch(player1.getLoadedSpringLen());
 			setStatusMessage("");
             return;
 		}
         else if (player2.isLoaded() && (key == 'k' || key == 'K')) {
-			player2.launch();
+            player2.launch(player2.getLoadedSpringLen());
             setStatusMessage("");
             return;
 		}

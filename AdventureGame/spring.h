@@ -37,6 +37,7 @@ public:
     const Point& getMiddle() const { return middle; }
     const Point& getEnd()    const { return end; }
     Direction getDirection() const { return direction; }
+	int getLength() const { return 3; } // אורך הקפיץ בשלושת החלקים שלו
 
     // ציור של שלושת החלקים לבאפר (נשתמש בזה מתוך Game::drawObjectsToBuffer)
     void drawToBuffer(std::vector<std::string>& buffer) const;

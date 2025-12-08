@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 #include "Point.h"
 #include "Direction.h"
 #include "ScreenID.h"
@@ -22,6 +22,8 @@ private:
 	int live = 3;
 	bool flying = false;
 	bool loaded = false;
+	int springTicksLeft = 0;
+	int lastLoadedSpringLength = 0;
 	Direction launchDirection = Direction::STAY;
 	GameObject* heldItem = nullptr;
 	ScreenId currentLevel = ScreenId::ROOM1;
@@ -64,7 +66,7 @@ public:
 	}
 	void move(Screen& screen,std::vector<GameObject*>& gameObjects);
 	void moveFlying(Screen& screen, std::vector<GameObject*>& gameObjects);
-	void launch();
+	void launch(int springLen);
 	Direction getDirection() const
 	{
 		return dir;
@@ -106,6 +108,9 @@ public:
 	int getHudY() const {
 		return hudY;
 	}
+	void startSpringEffect(int power);   // power = N (אורך הקפיץ)
+	void updateSpringEffect();           // יוריד טיק אחד בכל update של המשחק
+	void stopSpringEffect();             // מאפס מצב קפיץ (כשהטיימר נגמר או יש התנגשות)
 
 	Direction getLaunchDirection() const {
 		return launchDirection;
@@ -131,6 +136,8 @@ public:
 		return live;
 	}
 	void launch(Direction d);
+	int getLoadedSpringLen() const { return lastLoadedSpringLength; }
+	void setLoadedSpringLen(int len) { lastLoadedSpringLength = len; }
 
 	
 };

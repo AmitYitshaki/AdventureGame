@@ -109,6 +109,7 @@ void Spring::loadSpring(Player& p)
     p.stopMovement();
     p.setLoaded(true);
     p.setLaunchDirection(direction);
+	p.setLoadedSpringLen(getLength());
 }
 
 

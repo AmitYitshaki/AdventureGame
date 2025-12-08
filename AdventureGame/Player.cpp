@@ -82,10 +82,7 @@ void Player::moveFlying(Screen& screen, std::vector<GameObject*>& gameObjects)
     Point next(point.getX() + dx, point.getY() + dy, ' ');
 
     if (screen.isWall(next)) {
-        flying = false;
-        speed = 1;
-        launchDirection = Direction::STAY;
-        dir = Direction::STAY;
+        stopSpringEffect();
         return;
     }
 
@@ -103,21 +100,16 @@ void Player::moveFlying(Screen& screen, std::vector<GameObject*>& gameObjects)
             bool allowed = obj->handleCollision(*this, screen);
             if (!allowed) {
                 point.move(-dx, -dy);
-                flying = false;
-                speed = 1;
-                launchDirection = Direction::STAY;
-                dir = Direction::STAY;
+				stopSpringEffect();
                 return;
             }
         }
     }
 }
 
-void Player::launch()
+void Player::launch(int springLen)
 {
-    dir = launchDirection;
-	setFlying(true);
-    setLoaded(false);
+	startSpringEffect(springLen);
 }
 
 
@@ -203,4 +195,37 @@ Riddle* Player::getHeldRiddle() const
 void Player::decreaseLife() {
     if (live > 0)
         live--;
+}
+
+void Player::startSpringEffect(int power)
+{
+    // מספר מחזורי משחק להשפעה: N^2
+    springTicksLeft = power * power;
+
+    // השחקן "עובר למצב קפיץ"
+    flying = true;
+    loaded = false;            // כבר לא רק "טעון", אלא באמת משוגר
+    dir = launchDirection;     // נעול לכיוון השחרור
+}
+
+void Player::updateSpringEffect()
+{
+    if (!flying)
+        return;
+
+    if (springTicksLeft > 0)
+        springTicksLeft--;
+
+    if (springTicksLeft <= 0) {
+        stopSpringEffect();
+    }
+}
+
+void Player::stopSpringEffect()
+{
+    flying = false;
+    springTicksLeft = 0;
+    speed = 1;
+    launchDirection = Direction::STAY;
+    dir = Direction::STAY;
 }
