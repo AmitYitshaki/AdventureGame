@@ -29,7 +29,7 @@ Game::Game()
     // Initialize objects
     gameObjects = {
         new Key(15, 20, 'K', ScreenId::ROOM1, 1),
-        new Riddle(30, 5, ScreenId::ROOM1, RiddleId::RIDDLE1),
+        new Riddle(30,20, ScreenId::ROOM1, RiddleId::RIDDLE1),
         new Spring(Point(4,15,'w'), Point(3,15,'w'), Point(2,15,'W'), Direction::RIGHT, ScreenId::ROOM1),
         new Spring(Point(76,17,'w'),Point(77,17,'w'),Point(78,17,'W'),Direction::LEFT, ScreenId::ROOM1),
         new Door(79,12,'1', ScreenId::ROOM1, 1, ScreenId::ROOM2, true),
@@ -78,7 +78,7 @@ void Game::resetGame()
     // Re-create all game objects (same list as in ctor)
     gameObjects = {
         new Key(15, 20, 'K', ScreenId::ROOM1, 1),
-        new Riddle(30, 5, ScreenId::ROOM1, RiddleId::RIDDLE1),
+        new Riddle(30, 20, ScreenId::ROOM1, RiddleId::RIDDLE1),
         new Spring(Point(4, 15, 'w'), Point(3, 15, 'w'), Point(2, 15, 'W'), Direction::RIGHT, ScreenId::ROOM1),
         new Spring(Point(76, 17, 'w'), Point(77, 17, 'w'), Point(78, 17, 'W'), Direction::LEFT,  ScreenId::ROOM1),
         new Door(79, 12, '1', ScreenId::ROOM1, 1, ScreenId::ROOM2, true),
