@@ -1,17 +1,22 @@
 #pragma once
+
 #include "GameObject.h"
 
+/*
+    Key:
+    Simple collectible that unlocks a specific door.
+*/
 class Key : public GameObject
 {
 private:
-	int keyID;
+    int keyID;
+
 public:
-	Key(int x, int y, char c, ScreenId screen,int id)
-		: GameObject(x, y,'K', screen), keyID(id) {
-	}
+    Key(int x, int y, char c, ScreenId screen, int id)
+        : GameObject(x, y, c, screen, false, false),
+        keyID(id)
+    {
+    }
 
-	int getKeyID() const {
-		return keyID;
-	}
+    int getKeyID() const { return keyID; }
 };
-

@@ -1,11 +1,17 @@
 #pragma once
+
 #include "GameObject.h"
 
 class Player;
 class Screen;
 
-// Riddle identifiers
-enum class RiddleId {
+/*
+    Riddle:
+    Collectible puzzle item that opens a full-screen UI
+    when picked. Removed from world upon pickup.
+*/
+enum class RiddleId
+{
     RIDDLE1,
     RIDDLE2,
     RIDDLE3
@@ -23,7 +29,7 @@ private:
     int correctAnswer = 1;
     bool solved = false;
 
-    // Layouts for all riddles
+    // Static layouts
     static const char* RIDDLE1[HEIGHT];
     static const char* RIDDLE2[HEIGHT];
     static const char* RIDDLE3[HEIGHT];
@@ -35,14 +41,10 @@ public:
     RiddleId getId() const { return id; }
     int getCorrectAnswer() const { return correctAnswer; }
 
-    const char* getLine(int row) const {
-        if (row >= 0 && row < HEIGHT && layout != nullptr)
-            return layout[row];
-        return "";
-    }
+    const char* getLine(int row) const;
 
     bool isSolved() const { return solved; }
     void markSolved() { solved = true; }
 
-    virtual bool handleCollision(Player& p, const Screen& screen) override;
+    bool handleCollision(Player& p, const Screen& screen) override;
 };

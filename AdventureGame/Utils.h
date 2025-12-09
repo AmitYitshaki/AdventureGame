@@ -1,9 +1,15 @@
 #pragma once
-#include <cstdlib>
-#include <windows.h> // Required for Windows API console functions
+
+#include <windows.h>
 #include <iostream>
+
+/*
+    Console utility functions:
+    - gotoxy : moves cursor to (x,y)
+    - hideCursor : hides blinking caret
+    - cls : clears screen
+*/
 
 void gotoxy(int x, int y);
 void hideCursor();
 void cls();
-

@@ -1,5 +1,11 @@
-#include "Riddle.h"
+﻿#include "Riddle.h"
 #include "Player.h"
+
+/*
+    Riddle.cpp
+    Implements riddle construction, collision handling,
+    and holds the static ASCII layouts for all riddles.
+*/
 
 // ---------------------- Constructors ----------------------
 
@@ -7,7 +13,7 @@ Riddle::Riddle()
     : GameObject(2, 2, '?', ScreenId::ROOM1),
     id(RiddleId::RIDDLE1),
     layout(RIDDLE1),
-    correctAnswer(1),  
+    correctAnswer(1),
     solved(false)
 {
 }
@@ -23,17 +29,17 @@ Riddle::Riddle(int x, int y, ScreenId screen, RiddleId id)
     {
     case RiddleId::RIDDLE1:
         layout = RIDDLE1;
-        correctAnswer = 1;  
+        correctAnswer = 1;
         break;
 
     case RiddleId::RIDDLE2:
         layout = RIDDLE2;
-        correctAnswer = 1;  // true about references
+        correctAnswer = 1; // true about references
         break;
 
     case RiddleId::RIDDLE3:
         layout = RIDDLE3;
-        correctAnswer = 1;  // destructor automatically
+        correctAnswer = 1; // destructor automatically
         break;
 
     default:
@@ -43,27 +49,40 @@ Riddle::Riddle(int x, int y, ScreenId screen, RiddleId id)
     }
 }
 
+// ---------------------- Access to layout ----------------------
+
+const char* Riddle::getLine(int row) const
+{
+    if (!layout)
+        return "";
+
+    if (row < 0 || row >= HEIGHT)
+        return "";
+
+    return layout[row];
+}
+
 // ---------------------- handleCollision ----------------------
 
-bool Riddle::handleCollision(Player& p, const Screen& screen)
+bool Riddle::handleCollision(Player& p, const Screen& /*screen*/)
 {
     // Already collected? do nothing
     if (isCollected())
         return true;
 
+    // Player already holds an item → block
     if (p.hasItem())
-		return false; // block if player already has an item
+        return false;
 
+    // Let the player collect this riddle
     p.collectItem(this);
 
-    // Mark it as collected and remove from map
-    Collected();       // <-- Your version instead of setCollected(true)
-    removeFromGame();  // move to (-1,-1)
+    // Mark as collected and remove from map
+    Collected();
+    removeFromGame();  // move to (-1, -1)
 
     return true; // allow player to step on this tile
 }
-
-
 
 // ---------------------- RIDDLE 1 ----------------------
 // Topic: C++ operators, tricky behavior

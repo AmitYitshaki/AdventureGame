@@ -1,113 +1,93 @@
 #pragma once
+
 #include "Point.h"
 #include "ScreenID.h"
-#include <vector>
 
-// Forward declarations to avoid circular include dependency
+// Forward declarations (avoid unnecessary includes)
 class Player;
 class Screen;
 
+/*
+    GameObject:
+    Base class for all interactive objects in the game world.
+    Handles position, screen ownership, collision rules,
+    drawing, and inventory behavior.
+*/
 class GameObject
 {
-protected:
-	Point point;
-	ScreenId screenID;
-	bool solid;     // If true -> blocks player movement (like a wall/door)
-	bool collected; // If true -> currently in player's inventory
-
 public:
-	// Constructor: Initializes position, screen, and properties
-	GameObject(int x, int y, char c, ScreenId screen, bool solid = false, bool collected = false)
-		: point(x, y, c), screenID(screen), solid(solid), collected(collected) {
-	}
+    // --- Constructor & Destructor ---
+    GameObject(int x, int y, char symbol,
+        ScreenId screen,
+        bool solid = false,
+        bool collected = false)
+        : point(x, y, symbol),
+        screenID(screen),
+        solid(solid),
+        collected(collected)
+    {
+    }
 
-	// Virtual Destructor: Essential for proper cleanup of derived classes
-	virtual ~GameObject() {}
+    virtual ~GameObject() {}
 
-	// --- Virtual Logic Functions ---
+    // ------------------------------------------------------------
+    //                   COLLISION & LOGIC
+    // ------------------------------------------------------------
 
-	// Action performed when using the item (e.g., Bomb exploding)
-	virtual void use() {}
+    // Called when the player steps onto this object's location.
+    // Return true to allow walking onto the object, false to block.
+    virtual bool handleCollision(Player& p, const Screen& screen);
 
-	// Logic for collision with player. 
-	// Returns true if player can move into this spot, false if blocked.
-	virtual bool handleCollision(Player& p, const Screen& screen);
+    // Optional action trigger (for objects with an active ability)
+    virtual void use() {}
 
-	// --- Inventory Management Functions ---
+    // ------------------------------------------------------------
+    //              INVENTORY & GAME STATE MANAGEMENT
+    // ------------------------------------------------------------
 
-	// Updates state when collected by player
-	virtual void Collected() {
-		collected = true;
-	}
+    // Mark as collected by a player
+    virtual void Collected() { collected = true; }
 
+    // Mark as dropped into the world
+    virtual void drop() { collected = false; }
 
-	// Updates state when dropped by player
-	virtual void drop() {
-		collected = false;
-	}
+    // Move object to a coordinate in the current screen
+    virtual void dropToScreen(int x, int y);
 
-	// Logic to place the object back on the map at specific coordinates
-	virtual void dropToScreen(int x, int y);
+    // Soft-remove from world (move off-screen)
+    virtual void removeFromGame();
 
-	// Logic to logically remove object from game (e.g. move to -1, -1)
-	virtual void removeFromGame();
+    // ------------------------------------------------------------
+    //                       ACCESSORS
+    // ------------------------------------------------------------
 
-	// --- Getters & Setters ---
+    virtual bool isSolid() const { return solid; }
+    virtual bool isCollected() const { return collected; }
 
-	virtual bool isSolid() const {
-		return solid;
-	}
+    virtual ScreenId getScreenId() const { return screenID; }
+    void setScreenId(ScreenId newID) { screenID = newID; }
 
-	// Getter for collected state
-	virtual bool isCollected() const {
-		return collected;
-	}
-	// Redundant getter (kept for compatibility with existing code)
-	
+    int getX()  const { return point.getX(); }
+    int getY()  const { return point.getY(); }
+    char getChar() const { return point.getChar(); }
 
-	virtual void draw() const
-	{
-		point.draw();
-	}
+    Point getPoint() const { return point; }
 
-	virtual ScreenId getScreenId() const
-	{
-		return screenID;
-	}
+    // Update position on the map
+    void setPosition(int x, int y) { point.setPos(x, y); }
 
-	// --- Point Delegation (Accessing internal Point members) ---
+    // Check if object occupies (x,y)
+    virtual bool isAtPosition(int x, int y) const
+    {
+        return (x == point.getX() && y == point.getY());
+    }
 
-	int getX() const
-	{
-		return point.getX();
-	}
+    // Draw object directly (used in non-buffer mode)
+    virtual void draw() const { point.draw(); }
 
-	int getY() const
-	{
-		return point.getY();
-	}
-
-	void setPosition(int x, int y)
-	{
-		point.setpoint(x, y);
-	}
-
-	// Helper to get the character representation (for Double Buffering)
-	char getChar() const {
-		return point.getChar();
-	}
-
-	// Helper to return the point object itself
-	Point getPoint() const {
-		return point;
-	}
-
-	// Crucial for moving objects between screens (e.g. dropping a key in a new room)
-	void setScreenId(ScreenId newID) {
-		screenID = newID;
-	}
-
-	virtual bool isAtPosition(int x, int y) const {
-		return (x == point.getX() && y == point.getY());
-	}
+protected:
+    Point point;           // Location and symbol
+    ScreenId screenID;     // Which room this object belongs to
+    bool solid;            // Whether player can walk through
+    bool collected;        // Whether inside player's inventory
 };

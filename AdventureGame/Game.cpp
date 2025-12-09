@@ -1,81 +1,171 @@
 ﻿#include "Game.h"
 #include "Riddle.h"
 #include <conio.h>
-#include <string> 
-#include <vector>
 #include <iostream>
 
-std::string Game::statusMessage = ""; // Initialize the static member
+// Static HUD message
+std::string Game::statusMessage = "";
 
-// --- Helper Functions Implementation ---
+/* ============================================================
+                        CONSTRUCTOR
+   ============================================================ */
 
-// 1. Initialize buffer from the current screen map
-std::vector<std::string> Game::initBuffer() {
+Game::Game()
+    : player1(2, 12, '$', 16),
+    player2(3, 12, '&', 35),
+    isRunning(true)
+{
+    // Initialize screens
+    screens[(int)ScreenId::HOME] = Screen(ScreenId::HOME);
+    screens[(int)ScreenId::INSTRUCTIONS] = Screen(ScreenId::INSTRUCTIONS);
+    screens[(int)ScreenId::ROOM1] = Screen(ScreenId::ROOM1);
+    screens[(int)ScreenId::ROOM2] = Screen(ScreenId::ROOM2);
+    screens[(int)ScreenId::ROOM3] = Screen(ScreenId::ROOM3);
+
+    screens[(int)ScreenId::ROOM2].setDark(true); // ROOM2 starts dark
+
+    currentScreen = &screens[(int)ScreenId::HOME];
+
+    // Initialize objects
+    gameObjects = {
+        new Key(15, 20, 'K', ScreenId::ROOM1, 1),
+        new Riddle(30, 5, ScreenId::ROOM1, RiddleId::RIDDLE1),
+        new Spring(Point(4,15,'w'), Point(3,15,'w'), Point(2,15,'W'), Direction::RIGHT, ScreenId::ROOM1),
+        new Spring(Point(76,17,'w'),Point(77,17,'w'),Point(78,17,'W'),Direction::LEFT, ScreenId::ROOM1),
+        new Door(79,12,'1', ScreenId::ROOM1, 1, ScreenId::ROOM2, true),
+        new Key(20,15,'K', ScreenId::ROOM2, 2),
+        new Torch(15,10,'!', ScreenId::ROOM2),
+        new Torch(14,10,'!', ScreenId::ROOM2),
+        new Riddle(77,12, ScreenId::ROOM2, RiddleId::RIDDLE2),
+        new Door(79,12,'2', ScreenId::ROOM2, 2, ScreenId::ROOM3, true)
+    };
+}
+
+/* ============================================================
+			        DESTRUCTOR & RESET
+   ============================================================ */
+
+Game::~Game()
+{
+    for (auto obj : gameObjects)
+        delete obj;
+
+    gameObjects.clear();
+}
+
+void Game::resetGame()
+{
+    // 1. Reset global game state
+    RiddleMode = false;
+    currentRiddle = nullptr;
+    currentRiddlePlayer = nullptr;
+    setStatusMessage("");
+
+    // 2. Delete old objects and rebuild them
+    for (auto obj : gameObjects) {
+        delete obj;
+    }
+    gameObjects.clear();
+
+    // Re-init screens (same as in constructor)
+    screens[(int)ScreenId::HOME] = Screen(ScreenId::HOME);
+    screens[(int)ScreenId::INSTRUCTIONS] = Screen(ScreenId::INSTRUCTIONS);
+    screens[(int)ScreenId::ROOM1] = Screen(ScreenId::ROOM1);
+    screens[(int)ScreenId::ROOM2] = Screen(ScreenId::ROOM2);
+    screens[(int)ScreenId::ROOM2].setDark(true);
+    screens[(int)ScreenId::ROOM3] = Screen(ScreenId::ROOM3);
+
+    // Re-create all game objects (same list as in ctor)
+    gameObjects = {
+        new Key(15, 20, 'K', ScreenId::ROOM1, 1),
+        new Riddle(30, 5, ScreenId::ROOM1, RiddleId::RIDDLE1),
+        new Spring(Point(4, 15, 'w'), Point(3, 15, 'w'), Point(2, 15, 'W'), Direction::RIGHT, ScreenId::ROOM1),
+        new Spring(Point(76, 17, 'w'), Point(77, 17, 'w'), Point(78, 17, 'W'), Direction::LEFT,  ScreenId::ROOM1),
+        new Door(79, 12, '1', ScreenId::ROOM1, 1, ScreenId::ROOM2, true),
+        new Key(20, 15, 'K', ScreenId::ROOM2, 2),
+        new Torch(15, 10, '!', ScreenId::ROOM2),
+        new Torch(14, 10, '!', ScreenId::ROOM2),
+        new Riddle(77, 12, ScreenId::ROOM2, RiddleId::RIDDLE2),
+        new Door(79, 12, '2', ScreenId::ROOM2, 2, ScreenId::ROOM3, true)
+    };
+
+    // 3. Reset players
+    player1.resetForNewGame(2, 12, '$', 16, ScreenId::ROOM1);
+    player2.resetForNewGame(3, 12, '&', 35, ScreenId::ROOM1);
+
+    // 4. Start on ROOM1
+    currentScreen = &screens[(int)ScreenId::ROOM1];
+}
+
+
+/* ============================================================
+                        DRAW SYSTEM
+   ============================================================ */
+
+std::vector<std::string> Game::initBuffer()
+{
     std::vector<std::string> buffer;
-    for (int i = 0; i < Screen::HEIGHT; ++i) {
+
+    for (int i = 0; i < Screen::HEIGHT; ++i)
+    {
         std::string line = currentScreen->getLine(i);
-        // Ensure the line is exactly 80 chars wide
-        if (line.length() < Screen::WIDTH) {
+
+        if (line.length() < Screen::WIDTH)
             line.resize(Screen::WIDTH, ' ');
-        }
+
         buffer.push_back(line);
     }
     return buffer;
 }
 
-// 2. Write a single character to the buffer safely
-void Game::writeToBuffer(std::vector<std::string>& buffer, int x, int y, char c) {
-    if (y >= 0 && y < buffer.size()) {
-        if (x >= 0 && x < buffer[y].size()) {
-            buffer[y][x] = c;
-        }
+void Game::writeToBuffer(std::vector<std::string>& buffer, int x, int y, char c)
+{
+    if (y >= 0 && y < (int)buffer.size() &&
+        x >= 0 && x < (int)buffer[y].size())
+    {
+        buffer[y][x] = c;
     }
 }
 
-// 3. Write a string to the buffer
-void Game::writeTextToBuffer(std::vector<std::string>& buffer, int x, int y, const std::string& text) {
-    for (size_t i = 0; i < text.length(); ++i) {
+void Game::writeTextToBuffer(std::vector<std::string>& buffer, int x, int y, const std::string& text)
+{
+    for (size_t i = 0; i < text.size(); ++i)
         writeToBuffer(buffer, x + (int)i, y, text[i]);
-    }
 }
 
-// 4. Draw game objects (Keys, Doors, etc.)
-void Game::drawObjectsToBuffer(std::vector<std::string>& buffer) {
+void Game::drawObjectsToBuffer(std::vector<std::string>& buffer)
+{
     ScreenId currentId = currentScreen->getScreenId();
 
-    for (auto obj : gameObjects) {
-        if (obj == nullptr)
+    for (auto obj : gameObjects)
+    {
+        if (!obj || obj->getScreenId() != currentId)
             continue;
-        if (obj->getScreenId() == currentId) {
-            
-            if (auto spring = dynamic_cast<Spring*>(obj)) {
 
-                spring->drawToBuffer(buffer);
-            }
-            else {
-                writeToBuffer(buffer, obj->getX(), obj->getY(), obj->getChar());
-                //if obj point is -1 -1 (removed from game) we don't draw it
-            }
-        }
+        if (auto spring = dynamic_cast<Spring*>(obj))
+            spring->drawToBuffer(buffer);
+        else
+            writeToBuffer(buffer, obj->getX(), obj->getY(), obj->getChar());
     }
 }
-// 5. Draw players
-void Game::drawPlayersToBuffer(std::vector<std::string>& buffer) {
-    if (currentScreen == &screens[(int)ScreenId::HOME] ||
-        currentScreen == &screens[(int)ScreenId::INSTRUCTIONS]) {
+
+void Game::drawPlayersToBuffer(std::vector<std::string>& buffer)
+{
+    if (currentScreen->getScreenId() == ScreenId::HOME ||
+        currentScreen->getScreenId() == ScreenId::INSTRUCTIONS)
         return;
-    }
+
     writeToBuffer(buffer, player1.getX(), player1.getY(), player1.getChar());
     writeToBuffer(buffer, player2.getX(), player2.getY(), player2.getChar());
-    writeToBuffer(buffer, player1.getHudX()-7, player1.getHudY(), player1.getLive()+'0');
-    writeToBuffer(buffer, player2.getHudX() - 7, player2.getHudY(), player2.getLive()+'0');
+
+    writeToBuffer(buffer, player1.getHudX() - 7, player1.getHudY(), player1.getLive() + '0');
+    writeToBuffer(buffer, player2.getHudX() - 7, player2.getHudY(), player2.getLive() + '0');
 }
 
-// 6. Draw status message (HUD)
-void Game::drawStatusToBuffer(std::vector<std::string>& buffer) {
-    if (!statusMessage.empty()) {
-        writeTextToBuffer(buffer, 45, 0, statusMessage); // Adjusted X to 45 to fit nicely
-    }
+void Game::drawStatusToBuffer(std::vector<std::string>& buffer)
+{
+    if (!statusMessage.empty())
+        writeTextToBuffer(buffer, 45, 0, statusMessage);
 }
 
 void Game::drawRiddle(std::vector<std::string>& buffer)
@@ -83,24 +173,24 @@ void Game::drawRiddle(std::vector<std::string>& buffer)
     if (!currentRiddle)
         return;
 
-    const int boxW = Riddle::WIDTH;
-    const int boxH = Riddle::HEIGHT;
+    const int w = Riddle::WIDTH;
+    const int h = Riddle::HEIGHT;
 
-    // נרכז את התיבה באמצע המסך
-    int startX = (Screen::WIDTH - boxW) / 2;
-    int startY = (Screen::HEIGHT - boxH) / 2;
+    int startX = (Screen::WIDTH - w) / 2;
+    int startY = (Screen::HEIGHT - h) / 2;
 
-    for (int y = 0; y < boxH; ++y) {
+    for (int y = 0; y < h; ++y)
+    {
         const char* line = currentRiddle->getLine(y);
-        if (!line)
-            continue;
+        if (!line) continue;
 
-        for (int x = 0; x < boxW && line[x] != '\0'; ++x) {
+        for (int x = 0; x < w && line[x] != '\0'; ++x)
+        {
             int bx = startX + x;
             int by = startY + y;
 
-            if (by >= 0 && by < Screen::HEIGHT &&
-                bx >= 0 && bx < Screen::WIDTH)
+            if (bx >= 0 && bx < Screen::WIDTH &&
+                by >= 0 && by < Screen::HEIGHT)
             {
                 buffer[by][bx] = line[x];
             }
@@ -108,172 +198,336 @@ void Game::drawRiddle(std::vector<std::string>& buffer)
     }
 }
 
-
-// 7. Render the final buffer to the console
-void Game::renderBuffer(const std::vector<std::string>& buffer) {
+void Game::renderBuffer(const std::vector<std::string>& buffer)
+{
     gotoxy(0, 0);
-    for (const auto& line : buffer) {
+    for (const auto& line : buffer)
         std::cout << line << '\n';
-    }
-    std::cout.flush(); // Single flush for the entire frame
-}
 
-// --- Main Game Functions ---
+    std::cout.flush();
+}
 
 void Game::draw()
 {
-    // 1. Prepare Canvas
-    std::vector<std::string> buffer = initBuffer();
+    auto buffer = initBuffer();
 
-    // 2. Draw Layers
     drawObjectsToBuffer(buffer);
     drawPlayersToBuffer(buffer);
     drawStatusToBuffer(buffer);
-	applyLighting(buffer);
+    applyLighting(buffer);
 
-    if (RiddleMode && currentRiddle) {
+    if (RiddleMode && currentRiddle)
         drawRiddle(buffer);
-    }
 
-
-    // 3. Render to Screen
     renderBuffer(buffer);
 }
 
+/* ============================================================
+                          UPDATE
+   ============================================================ */
+
 void Game::update()
 {
-    int stepsP1 = player1.isFlying() ? 3 : 1; // כמה צעדים לעשות לשחקן 1
-    int stepsP2 = player2.isFlying() ? 3 : 1; // כמה צעדים לשחקן 2
+    int steps1 = player1.isFlying() ? 3 : 1;
+    int steps2 = player2.isFlying() ? 3 : 1;
 
-    for (int i = 0; i < stepsP1; ++i) {
+    // Player 1
+    for (int i = 0; i < steps1; ++i)
+    {
         player1.move(*currentScreen, gameObjects);
-        if (!player1.isFlying())
-            break;
+        if (!player1.isFlying()) break;
     }
 
-    for (int i = 0; i < stepsP2; ++i) {
+    // Player 2
+    for (int i = 0; i < steps2; ++i)
+    {
         player2.move(*currentScreen, gameObjects);
-        if (!player2.isFlying())
-            break;
+        if (!player2.isFlying()) break;
     }
 
-    if (player1.isFlying()) {
-        player1.updateSpringEffect();  // יוריד 1 מ-springTicksLeft, יעצור כשמגיע ל-0
-    }
+    if (player1.isFlying()) player1.updateSpringEffect();
+    if (player2.isFlying()) player2.updateSpringEffect();
 
-    if (player2.isFlying()) {
-        player2.updateSpringEffect();
-    }
-
-
+    // Only check transitions inside actual rooms
     if (currentScreen->getScreenId() != ScreenId::HOME &&
         currentScreen->getScreenId() != ScreenId::INSTRUCTIONS)
-    {
         checkLevelTransition();
-    }
 
     checkIsPlayerLoaded();
 
-    if (!RiddleMode && checkPlayerHasRiddle()) {
-        if (player1.hasRiddle()) {
-            currentRiddle = player1.getHeldRiddle();
-            startRiddle(currentRiddle, player1);
-        }
-        else if (player2.hasRiddle()) {
-            currentRiddle = player2.getHeldRiddle();
-            startRiddle(currentRiddle, player2);
-        }
+    // Riddle trigger
+    if (!RiddleMode && checkPlayerHasRiddle())
+    {
+        if (player1.hasRiddle())
+            startRiddle(player1.getHeldRiddle(), player1);
+        else if (player2.hasRiddle())
+            startRiddle(player2.getHeldRiddle(), player2);
     }
 }
 
+/* ============================================================
+                           INPUT
+   ============================================================ */
 
 void Game::handleInput()
 {
-    if (_kbhit())
+    if (!_kbhit()) return;
+
+    char key = _getch();
+
+    // If riddle mode → restrict input
+    if (RiddleMode && currentRiddle)
     {
-        char key = _getch();
-
-        if (RiddleMode && currentRiddle) {
-            handleRiddleInput(key);
-            return;
-        }
-        else if(currentScreen == &screens[(int)ScreenId::HOME] && key == '1') // Start new game
-        {
-            goToScreen(ScreenId::ROOM1);
-            return;
-        }
-        else if (currentScreen == &screens[(int)ScreenId::HOME] && key == '2')
-        {
-            goToScreen(ScreenId::INSTRUCTIONS);
-            return;
-        }
-        else if (currentScreen == &screens[(int)ScreenId::HOME] && key == '3')
-        {
-            end();
-            return;
-        }
-        else if (currentScreen == &screens[(int)ScreenId::INSTRUCTIONS] && (key == 'H' || key == 'h'))
-        {
-            goToScreen(ScreenId::HOME);
-            return;
-        }
-        else if (key == 27) // ESC key
-        {
-            pauseScreen();
-            return;
-        }
-        else if (player1.isLoaded() && (key == 's' || key == 'S')) {
-            player1.launch(player1.getLoadedSpringLen());
-			setStatusMessage("");
-            return;
-		}
-        else if (player2.isLoaded() && (key == 'k' || key == 'K')) {
-            player2.launch(player2.getLoadedSpringLen());
-            setStatusMessage("");
-            return;
-		}
-        else
-        {
-            ChangeDirection(key);
-
-            // Handle Dropping Items
-            if (key == 'e' || key == 'E') {
-                GameObject* obj = player1.dropItemToScreen(currentScreen->getScreenId());
-            }
-            else if (key == 'o' || key == 'O') {
-                GameObject* obj = player2.dropItemToScreen(currentScreen->getScreenId());
-            }
-        }
+        handleRiddleInput(key);
         return;
     }
+
+    // Main Menu input
+    if (currentScreen == &screens[(int)ScreenId::HOME])
+    {
+        if (key == '1') { resetGame(); }
+        if (key == '2') { goToScreen(ScreenId::INSTRUCTIONS); return; }
+        if (key == '3') { end(); return; }
+    }
+    //end screen (ROOM3) menu handlig
+    if (currentScreen == &screens[(int)ScreenId::ROOM3]) {
+        if (key == '1') {           // Play Again (New Game)
+            resetGame();
+        }
+        else if (key == '2') {      // Return to Main Menu
+            goToScreen(ScreenId::HOME);
+            setStatusMessage("");
+        }
+        else if (key == '3') {      // Quit Game
+            end();
+        }
+        // Ignore any other keys in ROOM3
+        return;
+    }
+
+    // Instructions → return to home
+    if (currentScreen == &screens[(int)ScreenId::INSTRUCTIONS] &&
+        (key == 'h' || key == 'H'))
+    {
+        goToScreen(ScreenId::HOME);
+        return;
+    }
+
+    // ESC → pause
+    if (key == 27)
+    {
+        pauseScreen();
+        return;
+    }
+
+    // Spring launching (STAY)
+    if (player1.isLoaded() && (key == 's' || key == 'S'))
+    {
+        player1.launch(player1.getLoadedSpringLen());
+        setStatusMessage("");
+        return;
+    }
+    if (player2.isLoaded() && (key == 'k' || key == 'K'))
+    {
+        player2.launch(player2.getLoadedSpringLen());
+        setStatusMessage("");
+        return;
+    }
+
+    // Movement
+    ChangeDirection(key);
+
+    // Item drop
+    if (key == 'E' || key == 'e')
+        player1.dropItemToScreen(currentScreen->getScreenId());
+    else if (key == 'O' || key == 'o')
+        player2.dropItemToScreen(currentScreen->getScreenId());
 }
 
 void Game::ChangeDirection(char c)
 {
-    // ----- Player 1 -----
-    if (c == 'w' || c == 'W') { player1.setDirection(Direction::UP); }
-    else if (c == 'x' || c == 'X') { player1.setDirection(Direction::DOWN); }
-    else if (c == 'a' || c == 'A') { player1.setDirection(Direction::LEFT); }
-    else if (c == 'd' || c == 'D') { player1.setDirection(Direction::RIGHT); }
-    else if (c == 's' || c == 'S') { player1.setDirection(Direction::STAY); }
+    // Player 1
+    if (c == 'w' || c == 'W') player1.setDirection(Direction::UP);
+    else if (c == 'x' || c == 'X') player1.setDirection(Direction::DOWN);
+    else if (c == 'a' || c == 'A') player1.setDirection(Direction::LEFT);
+    else if (c == 'd' || c == 'D') player1.setDirection(Direction::RIGHT);
+    else if (c == 's' || c == 'S') player1.setDirection(Direction::STAY);
 
-    // ----- Player 2 -----
-    else if (c == 'i' || c == 'I') { player2.setDirection(Direction::UP); }
-    else if (c == 'm' || c == 'M') { player2.setDirection(Direction::DOWN); }
-    else if (c == 'j' || c == 'J') { player2.setDirection(Direction::LEFT); }
-    else if (c == 'l' || c == 'L') { player2.setDirection(Direction::RIGHT); }
-    else if (c == 'k' || c == 'K') { player2.setDirection(Direction::STAY); }
+    // Player 2
+    else if (c == 'i' || c == 'I') player2.setDirection(Direction::UP);
+    else if (c == 'm' || c == 'M') player2.setDirection(Direction::DOWN);
+    else if (c == 'j' || c == 'J') player2.setDirection(Direction::LEFT);
+    else if (c == 'l' || c == 'L') player2.setDirection(Direction::RIGHT);
+    else if (c == 'k' || c == 'K') player2.setDirection(Direction::STAY);
 }
 
-void Game::start() {
-    hideCursor();
-    while (isRunning) {
-        handleInput();
-        update();
-        draw();
-        Sleep(240);
+void Game::setStatusMessage(const std::string& msg)
+{
+    statusMessage = msg;
+}
+
+/* ============================================================
+                         LIGHTING SYSTEM
+   ============================================================ */
+
+void Game::applyLighting(std::vector<std::string>& buffer)
+{
+    if (!currentScreen->isDark())
+        return;
+
+    const int BASE = 3;
+    const int TORCH = 7;
+
+    int p1x = player1.getX();
+    int p1y = player1.getY();
+    int p2x = player2.getX();
+    int p2y = player2.getY();
+
+    int r1 = player1.hasTorch() ? TORCH : BASE;
+    int r2 = player2.hasTorch() ? TORCH : BASE;
+
+    int r1s = r1 * r1;
+    int r2s = r2 * r2;
+
+    for (int y = 1; y < Screen::HEIGHT; ++y)
+    {
+        for (int x = 0; x < Screen::WIDTH; ++x)
+        {
+            int dx1 = x - p1x, dy1 = y - p1y;
+            int dx2 = x - p2x, dy2 = y - p2y;
+
+            int d1 = dx1 * dx1 + dy1 * dy1;
+            int d2 = dx2 * dx2 + dy2 * dy2;
+
+            if (d1 > r1s && d2 > r2s)
+                buffer[y][x] = ' ';
+        }
     }
-    cls();
+}
+
+/* ============================================================
+                    LEVEL TRANSITION SYSTEM
+   ============================================================ */
+
+void Game::resetPlayersForNewLevel()
+{
+    player1.updatepoint(2, 12);
+    player2.updatepoint(3, 12);
+
+    player1.setDirection(Direction::STAY);
+    player2.setDirection(Direction::STAY);
+
+    ScreenId currentId = currentScreen->getScreenId();
+    player1.setCurrentLevel(currentId);
+    player2.setCurrentLevel(currentId);
+
+     //show message for dark rooms
+    if (currentScreen->isDark())
+    {
+        setStatusMessage("This room is dark... Try a torch!");
+    }
+    else
+    {
+        setStatusMessage("");
+    }
+}
+
+
+void Game::checkLevelTransition()
+{
+    ScreenId t1 = player1.getCurrentLevel();
+    ScreenId t2 = player2.getCurrentLevel();
+    ScreenId real = currentScreen->getScreenId();
+
+    if (t1 != real && t2 == real){
+        setStatusMessage("Player 1 witting in next Room!");
+	    player1.updatepoint(-1, -1); //move player off-screen to avoid multiple triggers
+    }
+    else if (t2 != real && t1 == real){
+        setStatusMessage("Player 2 witting in next Room!");
+        player2.updatepoint(-1, -1); //move player off-screen to avoid multiple triggers
+    }
+
+    if (t1 != real && t2 != real && t1 == t2)
+    {
+        goToScreen(t1);
+        resetPlayersForNewLevel();
+    }
+}
+
+/* ============================================================
+                         RIDDLE SYSTEM
+   ============================================================ */
+
+bool Game::checkPlayerHasRiddle()
+{
+    return player1.hasRiddle() || player2.hasRiddle();
+}
+
+void Game::startRiddle(Riddle* riddle, Player& p)
+{
+    if (!riddle) return;
+
+    currentRiddle = riddle;
+    currentRiddlePlayer = &p;
+    RiddleMode = true;
+
+    stopMovement();
+    setStatusMessage("Riddle time! Press 1-4 to answer.");
+}
+
+void Game::handleRiddleInput(char key)
+{
+    if (!currentRiddle || !currentRiddlePlayer)
+        return;
+
+    if (key < '1' || key > '4')
+    {
+        setStatusMessage("Press 1-4");
+        return;
+    }
+
+    int selected = key - '0';
+    Player& p = *currentRiddlePlayer;
+
+    if (selected == currentRiddle->getCorrectAnswer())
+    {
+        setStatusMessage("Correct!");
+        p.removeHeldItem();
+
+        RiddleMode = false;
+        currentRiddle = nullptr;
+        currentRiddlePlayer = nullptr;
+    }
+    else
+    {
+        p.decreaseLife();
+        setStatusMessage("Wrong! You lost a life.");
+        draw();
+
+        if (p.getLive() <= 0)
+        {
+            RiddleMode = false;
+            currentRiddle = nullptr;
+            currentRiddlePlayer = nullptr;
+        }
+    }
+}
+
+/* ============================================================
+                         UTILITY
+   ============================================================ */
+
+void Game::stopMovement()
+{
+    player1.setDirection(Direction::STAY);
+    player2.setDirection(Direction::STAY);
+}
+
+void Game::checkIsPlayerLoaded()
+{
+    if (player1.isLoaded() || player2.isLoaded())
+        setStatusMessage("Spring ready! Press STAY.");
 }
 
 void Game::pauseScreen()
@@ -292,184 +546,32 @@ void Game::pauseScreen()
         if (_kbhit())
         {
             char key = _getch();
-            if (key == 27) // ESC key
-            {
-                return;
-            }
-            else if (key == 'H' || key == 'h') // H or h key
+            if (key == 27) return;
+            if (key == 'h' || key == 'H')
             {
                 goToScreen(ScreenId::HOME);
-				setStatusMessage("");
+                setStatusMessage("");
                 return;
             }
         }
     }
 }
 
-void Game::stopMovement()
+/* ============================================================
+                         MAIN LOOP
+   ============================================================ */
+
+void Game::start()
 {
-    player1.setDirection(Direction::STAY);
-    player2.setDirection(Direction::STAY);
-}
+    hideCursor();
 
-void Game::applyLighting(std::vector<std::string>& buffer)
-{
-    if (!currentScreen->isDark())
-        return;
-	const int WIDTH = Screen::WIDTH;
-	const int HEIGHT = Screen::HEIGHT;
-
-	const int BASE_LIGHT_RADIUS = 3; // Minimum light radius
-	const int TORCH_LIGHT_RADIUS = 7; // Additional radius if player has torch
-
-    const int p1x = player1.getX();
-    const int p1y = player1.getY();
-    const int p2x = player2.getX();
-    const int p2y = player2.getY();
-
-    const int r1 = player1.hasTorch() ? TORCH_LIGHT_RADIUS : BASE_LIGHT_RADIUS;
-    const int r2 = player2.hasTorch() ? TORCH_LIGHT_RADIUS : BASE_LIGHT_RADIUS;
-    const int r1s = r1 * r1; // ריבוע רדיוס 1
-    const int r2s = r2 * r2; // ריבוע רדיוס 2
-
-    for (int y = 1; y < HEIGHT; ++y) {
-        for (int x = 0; x < WIDTH; ++x) {
-            int dx1 = x - p1x;
-            int dy1 = y - p1y;
-            int dx2 = x - p2x;
-            int dy2 = y - p2y;
-            int dist1s = dx1 * dx1 + dy1 * dy1; // ריבוע המרחק לשחקן 1
-            int dist2s = dx2 * dx2 + dy2 * dy2; // ריבוע המרחק לשחקן 2
-            if (dist1s > r1s && dist2s > r2s) {
-                buffer[y][x] = ' ';
-            }
-        }
-	}
-}
-
-void Game::setStatusMessage(const std::string& msg)
-{
-    statusMessage = msg;
-}
-
-
-void Game::resetPlayersForNewLevel()
-{
-    player1.updatepoint(2, 12);
-    player2.updatepoint(3, 12); // Moved slightly right so they don't overlap
-    player1.setDirection(Direction::STAY);
-    player2.setDirection(Direction::STAY);
-
-    // Sync logical level (allready done before but good to make sure
-    ScreenId currentId = currentScreen->getScreenId();
-    player1.setCurrentLevel(currentId);
-    player2.setCurrentLevel(currentId);
-}
-
-void Game::startRiddle(Riddle* riddle, Player& p)
-{
-    if (!riddle)
-        return;
-
-    currentRiddle = riddle;
-    currentRiddlePlayer = &p;
-    RiddleMode = true;
-
-    stopMovement();
-    setStatusMessage("Riddle time! Press 1-4 to answer.");
-}
-
-
-
-
-bool Game::checkPlayerHasRiddle(){return player1.hasRiddle() || player2.hasRiddle();}
-
-void Game::checkLevelTransition()
-{
-
-    ScreenId target1 = player1.getCurrentLevel();
-    ScreenId target2 = player2.getCurrentLevel();
-    ScreenId currentRealLevel = currentScreen->getScreenId();
-
-    // Update Status Message
-    if (target1 != currentRealLevel && target2 == currentRealLevel) {
-        setStatusMessage("Player 1 is waiting...");
-    }
-    else if (target2 != currentRealLevel && target1 == currentRealLevel) {
-        setStatusMessage("Player 2 is waiting...");
-    }
-
-    // Check if both are ready to transition
-    if (target1 != currentRealLevel &&
-        target2 != currentRealLevel &&
-        target1 == target2)
+    while (isRunning)
     {
-        // Transition!
-        goToScreen(target1);
-        resetPlayersForNewLevel();
-        setStatusMessage("");
-    }
-}
-void Game::checkIsPlayerLoaded()
-{
-    if (player1.isLoaded() || player2.isLoaded()) {
-		setStatusMessage("Spring ready!Press STAY to launch");  
-    }
-}
-void Game::handleRiddleInput(char key)
-{
-    if (!currentRiddle || !currentRiddlePlayer)
-        return;
-
-    int choice = -1;
-    if (key >= '1' && key <= '4') {
-        choice = key - '0'; // '1' → 1, '2' → 2 ...
-    }
-    else {
-        setStatusMessage("Press an option 1-4");
-        return; // Ignore other keys
-    }
-
-    Player& p = *currentRiddlePlayer;  // This is the correct player
-
-    if (choice == currentRiddle->getCorrectAnswer()) {
-        // Correct answer
-        setStatusMessage("Correct! You may continue.");
-
-        // Remove riddle from player's inventory
-        p.removeHeldItem();
-
-        // Exit riddle mode
-        RiddleMode = false;
-        currentRiddle = nullptr;
-        currentRiddlePlayer = nullptr;
-    }
-    else {
-        // Wrong answer → decrease life for the correct player
-        p.decreaseLife();
-        setStatusMessage("Wrong! You lost a life. Try again.");
+        handleInput();
+        update();
         draw();
-		Sleep(1000); // Pause to show message
-
-
-        if (p.getLive() <= 0) {
-            // Player has no lives left
-            RiddleMode = false;
-            currentRiddle = nullptr;
-            currentRiddlePlayer = nullptr;
-            // TODO: game over logic can be added here
-        }
-        // If player is still alive → remain in RiddleMode,
-        // wait for the next key press.
+        Sleep(TICK_MS);
     }
-}
 
-
-
-Game::~Game()
-{
-    for (auto obj : gameObjects) {
-        delete obj;
-    }
-    gameObjects.clear();
+    cls();
 }

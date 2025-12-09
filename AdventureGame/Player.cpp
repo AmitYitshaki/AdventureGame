@@ -1,58 +1,108 @@
 ﻿#include "Player.h"
 #include "Screen.h"
-#include <vector>
 #include "GameObject.h"
 #include "Key.h"
 #include "Torch.h"
 #include "Riddle.h"
 #include "Door.h"
 #include "Game.h"
+#include <vector>
 
+/*
+    Player.cpp
+    Implements normal movement, flying (spring launch),
+    item handling, collisions, and life system.
+*/
 
-Player::~Player() {
-    if (heldItem != nullptr) {
-        delete heldItem;
-    }
+Player::~Player()
+{
+	heldItem = nullptr; // Do not delete held item; managed by Game
 }
 
-void Player::move(Screen& screen, std::vector<GameObject*>& gameObjects) {
+void Player::resetForNewGame(int x, int y, char c, int hudPos, ScreenId startLevel)
+{
+    // Position & char
+    point.setPos(x, y);   // לפי השינוי שעשית (setPos)
+    point.setChar(c);
 
+    // HUD location
+    hudX = hudPos;
+    hudY = 0;
+
+    // Basic movement state
+    dir = Direction::STAY;
+    speed = 1;
+
+    // Life & level
+    live = 3;
+    currentLevel = startLevel;
+
+    // Spring / flying state
+    flying = false;
+    loaded = false;
+    springTicksLeft = 0;
+    lastLoadedSpringLength = 0;
+    launchDirection = Direction::STAY;
+
+    // Inventory
+    heldItem = nullptr;
+}
+
+
+
+/* ----------------------------------------------------
+                    NORMAL MOVEMENT
+   ---------------------------------------------------- */
+
+void Player::move(Screen& screen, std::vector<GameObject*>& gameObjects)
+{
+    // If flying due to spring effect → redirect movement
     if (isFlying())
     {
         moveFlying(screen, gameObjects);
         return;
     }
-    
+
     int dx = 0, dy = 0;
 
-    switch (dir) {
-    case Direction::UP: dy = -1; dx = 0; break;
-    case Direction::DOWN: dy = 1; dx = 0; break;
-    case Direction::LEFT: dx = -1; dy = 0; break;
-    case Direction::RIGHT: dx = 1; dy = 0; break;
-    case Direction::STAY: return;
+    switch (dir)
+    {
+    case Direction::UP:    dy = -1; break;
+    case Direction::DOWN:  dy = 1; break;
+    case Direction::LEFT:  dx = -1; break;
+    case Direction::RIGHT: dx = 1; break;
+    case Direction::STAY:  return;
     }
 
     Point next(point.getX() + dx, point.getY() + dy, ' ');
 
-    if (screen.isWall(next)) {
+    // Wall collision stopping regular movement
+    if (screen.isWall(next))
+    {
         stopMovement();
         return;
     }
 
-    point.move(dx,dy);
+    // Move
+    point.move(dx, dy);
 
+    // Handle collisions with game objects
     ScreenId currentScreenId = screen.getScreenId();
-    int playerX = point.getX();
-    int playerY = point.getY();
-    for (auto obj : gameObjects) {
+    int px = point.getX();
+    int py = point.getY();
+
+    for (auto obj : gameObjects)
+    {
         if (obj->getScreenId() != currentScreenId)
             continue;
 
-        if (obj->isAtPosition(playerX, playerY) && !obj->isCollected())
+        if (obj->isAtPosition(px, py) && !obj->isCollected())
         {
             bool allowed = obj->handleCollision(*this, screen);
-            if (!allowed) {
+
+            if (!allowed)
+            {
+                // Undo movement
                 point.move(-dx * speed, -dy * speed);
                 dir = Direction::STAY;
             }
@@ -60,152 +110,84 @@ void Player::move(Screen& screen, std::vector<GameObject*>& gameObjects) {
     }
 }
 
-
+/* ----------------------------------------------------
+                SPRING / FLYING MOVEMENT
+   ---------------------------------------------------- */
 
 void Player::moveFlying(Screen& screen, std::vector<GameObject*>& gameObjects)
 {
     int dx = 0, dy = 0;
 
-    // כיוון בסיס מהקפיץ
-    switch (launchDirection) {
+    // Base launch direction from spring
+    switch (launchDirection)
+    {
     case Direction::UP:    dy = -1; break;
-    case Direction::DOWN:  dy = 1;  break;
+    case Direction::DOWN:  dy = 1; break;
     case Direction::LEFT:  dx = -1; break;
-    case Direction::RIGHT: dx = 1;  break;
-    default: return;
+    case Direction::RIGHT: dx = 1; break;
+    default:
+        return;
     }
 
-    // סטייה אנכית לפי dir
+    // Allow vertical deviation inputs while flying
     if (dir == Direction::UP)        dy -= 1;
     else if (dir == Direction::DOWN) dy += 1;
 
     Point next(point.getX() + dx, point.getY() + dy, ' ');
 
-    if (screen.isWall(next)) {
+    // Wall collision stops spring effect
+    if (screen.isWall(next))
+    {
         stopSpringEffect();
         return;
     }
 
+    // Move
     point.move(dx, dy);
 
+    // Handle collisions with other objects
     ScreenId currentScreenId = screen.getScreenId();
-    int playerX = point.getX();
-    int playerY = point.getY();
+    int px = point.getX();
+    int py = point.getY();
 
-    for (auto obj : gameObjects) {
+    for (auto obj : gameObjects)
+    {
         if (obj->getScreenId() != currentScreenId)
             continue;
 
-        if (obj->isAtPosition(playerX, playerY) && !obj->isCollected()) {
+        if (obj->isAtPosition(px, py) && !obj->isCollected())
+        {
             bool allowed = obj->handleCollision(*this, screen);
-            if (!allowed) {
+
+            if (!allowed)
+            {
+                // Undo movement and end spring effect
                 point.move(-dx, -dy);
-				stopSpringEffect();
+                stopSpringEffect();
                 return;
             }
         }
     }
 }
 
+/* ----------------------------------------------------
+                    SPRING LAUNCH
+   ---------------------------------------------------- */
+
 void Player::launch(int springLen)
 {
-	startSpringEffect(springLen);
+    // springLen = N, startSpringEffect computes N^2
+    startSpringEffect(springLen);
 }
 
-
-bool Player::collectItem(GameObject* item)
+void Player::startSpringEffect(int springLen)
 {
-    if (!hasItem())
-    {
-        heldItem = item;
-        item->Collected();
-		item->setPosition(hudX, hudY);
-        Game::setStatusMessage(std::string("Collected item '") + item->getChar() + "'");
-        return true;
-	}
-    return false;
-}
+    // Duration = N^2 game cycles
+    springTicksLeft = springLen * springLen;
 
-GameObject* Player::dropItemToScreen(ScreenId currentScreenID)
-{
-    if (hasItem())
-    {
-        GameObject* itemToDrop = heldItem;
-
-        // 1. החפץ חוזר למיקום השחקן
-        itemToDrop->setPosition(point.getX(), point.getY());
-
-        // 2. החפץ משויך לחדר הנוכחי (קריטי למעבר חדרים)
-        itemToDrop->setScreenId(currentScreenID);
-
-        // 3. החפץ מסומן כ"לא בתיק"
-        itemToDrop->drop();
-
-        Game::setStatusMessage(std::string("Dropped item '") + itemToDrop->getChar() + "'");
-      
-        // 4. ניתוק מהשחקן
-        heldItem = nullptr;
-
-        return itemToDrop;
-    }
-    return nullptr;
-}
-
-void Player::removeHeldItem()
-{
-    heldItem->removeFromGame();
-	heldItem = nullptr;
-}
-
-int Player::getHeldKeyID() const
-{
-    if (heldItem != nullptr) {
-        Key* k = dynamic_cast<Key*>(heldItem);
-        if (k != nullptr)
-        {
-            return k->getKeyID();
-        }
-    }
-    return -1;
-} // לא מחזיק מפתח או מחזיק משהו אחר
-
-bool Player::hasTorch() const
-{
-    if (heldItem == nullptr)
-        return false;
-
-    return dynamic_cast<Torch*>(heldItem) != nullptr;
-}
-
-bool Player::hasRiddle() const
-{
-    if (heldItem == nullptr)
-        return false;
-
-    return dynamic_cast<Riddle*>(heldItem) != nullptr;
-}
-
-Riddle* Player::getHeldRiddle() const
-{
-    if(hasRiddle())
-		return dynamic_cast<Riddle*>(heldItem);
-	return nullptr;
-}
-
-void Player::decreaseLife() {
-    if (live > 0)
-        live--;
-}
-
-void Player::startSpringEffect(int power)
-{
-    // מספר מחזורי משחק להשפעה: N^2
-    springTicksLeft = power * power;
-
-    // השחקן "עובר למצב קפיץ"
     flying = true;
-    loaded = false;            // כבר לא רק "טעון", אלא באמת משוגר
-    dir = launchDirection;     // נעול לכיוון השחרור
+    loaded = false;
+    dir = launchDirection; // lock initial launch direction
 }
 
 void Player::updateSpringEffect()
@@ -216,9 +198,8 @@ void Player::updateSpringEffect()
     if (springTicksLeft > 0)
         springTicksLeft--;
 
-    if (springTicksLeft <= 0) {
+    if (springTicksLeft <= 0)
         stopSpringEffect();
-    }
 }
 
 void Player::stopSpringEffect()
@@ -226,6 +207,95 @@ void Player::stopSpringEffect()
     flying = false;
     springTicksLeft = 0;
     speed = 1;
+
     launchDirection = Direction::STAY;
     dir = Direction::STAY;
+}
+
+/* ----------------------------------------------------
+                    ITEM HANDLING
+   ---------------------------------------------------- */
+
+bool Player::collectItem(GameObject* item)
+{
+    if (!hasItem())
+    {
+        heldItem = item;
+        item->Collected();
+
+        // Attach to HUD position
+        item->setPosition(hudX, hudY);
+
+        Game::setStatusMessage(std::string("Collected item '") + item->getChar() + "'");
+        return true;
+    }
+    return false;
+}
+
+GameObject* Player::dropItemToScreen(ScreenId currentScreenID)
+{
+    if (!hasItem())
+        return nullptr;
+
+    GameObject* itemToDrop = heldItem;
+
+    itemToDrop->setPosition(point.getX(), point.getY());
+    itemToDrop->setScreenId(currentScreenID);
+    itemToDrop->drop();
+
+    Game::setStatusMessage(std::string("Dropped item '") + itemToDrop->getChar() + "'");
+
+    heldItem = nullptr;
+    return itemToDrop;
+}
+
+void Player::removeHeldItem()
+{
+    if (heldItem)
+    {
+        heldItem->removeFromGame();
+        heldItem = nullptr;
+    }
+}
+
+/* ----------------------------------------------------
+                    INVENTORY QUERIES
+   ---------------------------------------------------- */
+
+int Player::getHeldKeyID() const
+{
+    if (heldItem)
+    {
+        if (auto k = dynamic_cast<Key*>(heldItem))
+            return k->getKeyID();
+    }
+    return -1;
+}
+
+bool Player::hasTorch() const
+{
+    return (heldItem && dynamic_cast<Torch*>(heldItem) != nullptr);
+}
+
+bool Player::hasRiddle() const
+{
+    return (heldItem && dynamic_cast<Riddle*>(heldItem) != nullptr);
+}
+
+Riddle* Player::getHeldRiddle() const
+{
+    if (hasRiddle())
+        return dynamic_cast<Riddle*>(heldItem);
+
+    return nullptr;
+}
+
+/* ----------------------------------------------------
+                        LIFE SYSTEM
+   ---------------------------------------------------- */
+
+void Player::decreaseLife()
+{
+    if (live > 0)
+        live--;
 }
