@@ -2,6 +2,8 @@
 
 #include "Point.h"
 #include "ScreenID.h"
+#include <vector>
+#include <string>
 
 /*
     Screen:
@@ -33,6 +35,11 @@ public:
         return screenID;
     }
 
+    void setScreenId(ScreenId id)
+    {
+        screenID = id;
+	}
+
     bool isDark() const
     {
         return dark;
@@ -43,24 +50,29 @@ public:
         dark = isDark;
     }
 
-    // Return a raw C-string for a given row (used to init buffer)
-    const char* getLine(int row) const
+    void setLayout(const std::vector<std::string>& newLayout)
     {
-        if (row >= 0 && row < HEIGHT && layout != nullptr)
-            return layout[row];
+        layout = newLayout;
+	}
 
+    // Return a raw C-string for a given row (used to init buffer)
+    std::string getLine(int row) const
+    {
+		if (row >= 0 && row < layout.size())
+            return layout[row];
         return "";
     }
 
+    void setStartPos1(int x, int y) { startPos1.setPos(x, y); }
+    void setStartPos2(int x, int y) { startPos2.setPos(x, y); }
+
+    Point getStartPos1() const { return startPos1; }
+    Point getStartPos2() const { return startPos2; }
+
 private:
     ScreenId screenID = ScreenId::HOME;
-    const char* const* layout = nullptr; // Pointer to the static layout table
+	std::vector<std::string> layout; // vector of strings for dynamic access
     bool dark = false;                   // Used by lighting logic in Game
-
-    // Static layouts for all screens
-    static const char* HOME_LAYOUT[HEIGHT];
-    static const char* INSTRUCTIONS_LAYOUT[HEIGHT];
-    static const char* ROOM1_LAYOUT[HEIGHT];
-    static const char* ROOM2_LAYOUT[HEIGHT];
-    static const char* ROOM3_LAYOUT[HEIGHT];
+    Point startPos1 = { 1, 1, ' ' }; // נקודת התחלה לשחקן 1
+    Point startPos2 = { 1, 1, ' ' }; // נקודת התחלה לשחקן 2
 };

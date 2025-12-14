@@ -132,6 +132,7 @@ public:
     // --- life system ---
     void decreaseLife();
     int getLive() const { return live; }
+	void resetLives() { live = 3; }
 
     // --- spring stored data ---
     int getLoadedSpringLen() const { return lastLoadedSpringLength; }

@@ -1,5 +1,4 @@
 ﻿#include "Game.h"
-#include "Riddle.h"
 #include <conio.h>
 #include <iostream>
 
@@ -11,34 +10,12 @@ std::string Game::statusMessage = "";
    ============================================================ */
 
 Game::Game()
-    : player1(2, 12, '$', 16),
-    player2(3, 12, '&', 35),
-    isRunning(true)
+    : player1(0, 0, '$', 16), // מאתחלים עם ערכים זמניים, הטעינה תדרוס אותם
+    player2(0, 0, '&', 35),
+    isRunning(true),
+    currentScreen(nullptr)
 {
-    // Initialize screens
-    screens[(int)ScreenId::HOME] = Screen(ScreenId::HOME);
-    screens[(int)ScreenId::INSTRUCTIONS] = Screen(ScreenId::INSTRUCTIONS);
-    screens[(int)ScreenId::ROOM1] = Screen(ScreenId::ROOM1);
-    screens[(int)ScreenId::ROOM2] = Screen(ScreenId::ROOM2);
-    screens[(int)ScreenId::ROOM3] = Screen(ScreenId::ROOM3);
-
-    screens[(int)ScreenId::ROOM2].setDark(true); // ROOM2 starts dark
-
-    currentScreen = &screens[(int)ScreenId::HOME];
-
-    // Initialize objects
-    gameObjects = {
-        new Key(15, 20, 'K', ScreenId::ROOM1, 1),
-        new Riddle(30,20, ScreenId::ROOM1, RiddleId::RIDDLE1),
-        new Spring(Point(4,15,'w'), Point(3,15,'w'), Point(2,15,'W'), Direction::RIGHT, ScreenId::ROOM1),
-        new Spring(Point(76,17,'w'),Point(77,17,'w'),Point(78,17,'W'),Direction::LEFT, ScreenId::ROOM1),
-        new Door(79,12,'1', ScreenId::ROOM1, 1, ScreenId::ROOM2, true),
-        new Key(20,15,'K', ScreenId::ROOM2, 2),
-        new Torch(15,10,'!', ScreenId::ROOM2),
-        new Torch(14,10,'!', ScreenId::ROOM2),
-        new Riddle(77,12, ScreenId::ROOM2, RiddleId::RIDDLE2),
-        new Door(79,12,'2', ScreenId::ROOM2, 2, ScreenId::ROOM3, true)
-    };
+    initGame();
 }
 
 /* ============================================================
@@ -53,50 +30,55 @@ Game::~Game()
     gameObjects.clear();
 }
 
-void Game::resetGame()
+void Game::initGame()
 {
-    // 1. Reset global game state
-    RiddleMode = false;
-    currentRiddle = nullptr;
-    currentRiddlePlayer = nullptr;
-    setStatusMessage("");
-
-    // 2. Delete old objects and rebuild them
-    for (auto obj : gameObjects) {
-        delete obj;
-    }
-    gameObjects.clear();
-
-    // Re-init screens (same as in constructor)
+    // טעינת מסך הבית
     screens[(int)ScreenId::HOME] = Screen(ScreenId::HOME);
+    LevelLoader::loadScreenFromFile("StartScreen.txt", screens[(int)ScreenId::HOME]);
+
+    // טעינת מסך הוראות (כדי שאפשר יהיה לצפות בהן לפני שמתחילים לשחק)
     screens[(int)ScreenId::INSTRUCTIONS] = Screen(ScreenId::INSTRUCTIONS);
-    screens[(int)ScreenId::ROOM1] = Screen(ScreenId::ROOM1);
-    screens[(int)ScreenId::ROOM2] = Screen(ScreenId::ROOM2);
-    screens[(int)ScreenId::ROOM2].setDark(true);
-    screens[(int)ScreenId::ROOM3] = Screen(ScreenId::ROOM3);
+    LevelLoader::loadScreenFromFile("Instructions.txt", screens[(int)ScreenId::INSTRUCTIONS]);
 
-    // Re-create all game objects (same list as in ctor)
-    gameObjects = {
-        new Key(15, 20, 'K', ScreenId::ROOM1, 1),
-        new Riddle(30, 20, ScreenId::ROOM1, RiddleId::RIDDLE1),
-        new Spring(Point(4, 15, 'w'), Point(3, 15, 'w'), Point(2, 15, 'W'), Direction::RIGHT, ScreenId::ROOM1),
-        new Spring(Point(76, 17, 'w'), Point(77, 17, 'w'), Point(78, 17, 'W'), Direction::LEFT,  ScreenId::ROOM1),
-        new Door(79, 12, '1', ScreenId::ROOM1, 1, ScreenId::ROOM2, true),
-        new Key(20, 15, 'K', ScreenId::ROOM2, 2),
-        new Torch(15, 10, '!', ScreenId::ROOM2),
-        new Torch(14, 10, '!', ScreenId::ROOM2),
-        new Riddle(77, 12, ScreenId::ROOM2, RiddleId::RIDDLE2),
-        new Door(79, 12, '2', ScreenId::ROOM2, 2, ScreenId::ROOM3, true)
-    };
-
-    // 3. Reset players
-    player1.resetForNewGame(2, 12, '$', 16, ScreenId::ROOM1);
-    player2.resetForNewGame(3, 12, '&', 35, ScreenId::ROOM1);
-
-    // 4. Start on ROOM1
-    currentScreen = &screens[(int)ScreenId::ROOM1];
+    currentScreen = &screens[(int)ScreenId::HOME];
 }
 
+void Game::resetGame()
+{
+    // 1. איפוס משתנים לוגיים
+    RiddleMode = false;
+    currentRiddle = nullptr;
+    setStatusMessage("");
+
+    // 2. מחיקת אובייקטים ישנים (חשוב מאוד!)
+    for (auto obj : gameObjects) delete obj;
+    gameObjects.clear();
+
+    // 3. איפוס נתוני שחקנים (חיים, ניקוד וכו') - אם יש לך פונקציה כזו ב-Player
+    player1.resetLives(); // הנחה: הוספת פונקציה כזו
+    player2.resetLives();
+	player1.removeHeldItem();
+	player2.removeHeldItem();
+
+    // 4. טעינת שלבי המשחק "טריים" מהקבצים
+    // אנחנו דורסים את מה שהיה בזיכרון בטעינה חדשה
+
+    // ROOM 1
+    screens[(int)ScreenId::ROOM1] = Screen(ScreenId::ROOM1);
+    LevelLoader::loadLevelFromFile("Room1Screen.txt", screens[(int)ScreenId::ROOM1], gameObjects);
+
+    // ROOM 2
+    screens[(int)ScreenId::ROOM2] = Screen(ScreenId::ROOM2);
+    LevelLoader::loadLevelFromFile("Room2Screen.txt", screens[(int)ScreenId::ROOM2], gameObjects);
+
+    // ROOM 3
+    screens[(int)ScreenId::ROOM3] = Screen(ScreenId::ROOM3);
+    LevelLoader::loadLevelFromFile("Room3Screen.txt", screens[(int)ScreenId::ROOM3], gameObjects);
+
+    // 5. התחלת המשחק בפועל!
+    // מכיוון שלחצנו "Start New Game", אנחנו רוצים לעבור ישר לחדר 1
+    goToScreen(ScreenId::ROOM1);
+}
 
 /* ============================================================
                         DRAW SYSTEM
@@ -452,6 +434,29 @@ void Game::checkLevelTransition()
     {
         goToScreen(t1);
         resetPlayersForNewLevel();
+    }
+}
+
+void Game::goToScreen(ScreenId id)
+{
+    // 1. עדכון המסך הנוכחי
+    currentScreen = &screens[(int)id];
+
+    // 2. שליפת נקודות ההתחלה שה-LevelLoader שמר בתוך המסך
+    Point start1 = currentScreen->getStartPos1();
+    Point start2 = currentScreen->getStartPos2();
+
+    // 3. איפוס השחקנים למיקום החדש (כולל ה-HUD שלהם)
+    // שים לב: אנחנו שולחים את id בתור המסך הנוכחי שלהם
+    player1.resetForNewGame(start1.getX(), start1.getY(), '$', player1.getHudX(), id);
+    player2.resetForNewGame(start2.getX(), start2.getY(), '&', player2.getHudX(), id);
+
+    // 4. ניקוי הודעות
+    setStatusMessage("");
+
+    // בונוס: אם המסך חשוך, נעדכן הודעה
+    if (currentScreen->isDark()) {
+        setStatusMessage("It's dark here... you need a Torch!");
     }
 }
 

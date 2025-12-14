@@ -14,6 +14,7 @@
 #include "Spring.h"
 #include "Torch.h"
 #include "Riddle.h"
+#include "LevelLoader.h"
 
 /*
     Game:
@@ -35,6 +36,7 @@ public:
     void handleInput();
 
     // --- Game State ---
+    void initGame();
     void resetGame();
     bool running() const { return isRunning; }
     void end() { isRunning = false; }
@@ -103,9 +105,7 @@ private:
     void startRiddle(Riddle* riddle, Player& p);
 
     // Navigation
-    void goToScreen(ScreenId id) {
-        currentScreen = &screens[(int)id];
-    }
+    void goToScreen(ScreenId id);
 
     // Pause screen
     void pauseScreen();

@@ -1,0 +1,25 @@
+################################################################################
+#                                                                              #
+#                         ADVENTURE GAME - INSTRUCTIONS                        #
+#                                                                              #
+#  Goal:                                                                       #
+#    Both players ($ and &) must cooperate, move through rooms and use items   #
+#    to reach the final room.                                                  #
+#                                                                              #
+#  Controls:                                                                   #
+#    Player 1 ($): W=up  X=down  A=left  D=right  S=stay  E=drop item          #
+#    Player 2 (&): I=up  M=down  J=left  L=right  K=stay  O=drop item          #
+#                                                                              #
+#  Movement & Walls:                                                           #
+#    Direction continues until wall or STAY. No moving through walls.          #
+#                                                                              #
+#  Items:                                                                      #
+#    spring - launches the player ahead.                                       #
+#    Keys - open matching doors ; torch - expands light in dark rooms.         #
+#    riddle - must to be PICKED UP by the players, wrong answer loses 1 life.  #
+#                                                                              #
+#  Pause/Home:                                                                 #
+#    ESC pauses; another ESC=continue, H= return to Home screen.               #
+#                                GOOD LUCK!                                    #
+#                                                                              #
+################################################################################
