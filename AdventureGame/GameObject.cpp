@@ -25,6 +25,12 @@ void GameObject::removeFromGame()
     setPosition(-1, -1);
 }
 
+void GameObject::setChar(char newC)
+{
+    // אופציה א': אם יש לך אובייקט point
+    point.setChar(newC);
+}
+
 // ------------------------------------------------------------
 //                        COLLISION
 // ------------------------------------------------------------

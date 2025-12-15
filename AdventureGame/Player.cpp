@@ -56,6 +56,14 @@ void Player::resetForNewGame(int x, int y, char c, int hudPos, ScreenId startLev
 
 void Player::move(Screen& screen, std::vector<GameObject*>& gameObjects)
 {
+	if (point.getX() == -1 || point.getY() == -1) //if player is off-screen
+    {
+        return;
+    }
+	if (isLoaded()) //player is in loaded state
+    {
+        return;
+    }
     // If flying due to spring effect → redirect movement
     if (isFlying())
     {

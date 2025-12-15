@@ -49,6 +49,8 @@ public:
     // Helper: opposite direction for entry validation
     static Direction oppositeDirection(Direction d);
 
+    void setDirection(Direction newDir);
+
 private:
     Point start;
     Point middle;

@@ -1,11 +1,6 @@
-#pragma once
-
+﻿#pragma once
 #include "GameObject.h"
 
-/*
-    Key:
-    Simple collectible that unlocks a specific door.
-*/
 class Key : public GameObject
 {
 private:
@@ -13,10 +8,14 @@ private:
 
 public:
     Key(int x, int y, char c, ScreenId screen, int id)
-        : GameObject(x, y, c, screen, false, false),
+        : GameObject(x, y, c, screen, false, false), // solid=false, static=false
         keyID(id)
     {
     }
 
+    void setKeyID(int newID) { keyID = newID; }
     int getKeyID() const { return keyID; }
+
+    // מחקנו את handleCollision!
+    // המפתח ישתמש בפונקציה של האבא (GameObject) שתקרא ל-player.collectItem(this)
 };

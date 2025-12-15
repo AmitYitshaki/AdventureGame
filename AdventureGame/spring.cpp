@@ -57,6 +57,41 @@ Direction Spring::oppositeDirection(Direction d)
     }
 }
 
+// שומרים על בניית הקפיץ "קדימה" כדי שהציור יתאים
+void Spring::setDirection(Direction newDir)
+{
+    direction = newDir;
+    int x = start.getX();
+    int y = start.getY();
+
+    switch (direction)
+    {
+    case Direction::UP:    // Body expands Down (launch up)
+        middle.setPos(x, y - 1); // תיקון: אם משגרים למעלה, הגוף צריך להיות למעלה (ויזואלית) או למטה?
+        // בגרסה האחרונה שעבדה ויזואלית השתמשנו בלוגיקה של הכיוון עצמו:
+        // UP = Y קטן.
+        middle.setPos(x, y - 1);
+        end.setPos(x, y - 2);
+        break;
+    case Direction::DOWN:
+        middle.setPos(x, y + 1);
+        end.setPos(x, y + 2);
+        break;
+    case Direction::LEFT:
+        middle.setPos(x - 1, y);
+        end.setPos(x - 2, y);
+        break;
+    case Direction::RIGHT:
+        middle.setPos(x + 1, y);
+        end.setPos(x + 2, y);
+        break;
+    case Direction::STAY:
+        middle.setPos(x, y);
+        end.setPos(x, y);
+        break;
+    }
+}
+
 /* ----------------------------------------------------
                 SPRING COLLISION LOGIC
    ---------------------------------------------------- */
@@ -66,57 +101,75 @@ bool Spring::handleCollision(Player& p, const Screen& screen)
     int px = p.getX();
     int py = p.getY();
 
-    bool onStart = (px == start.getX() && py == start.getY());
-    bool onMiddle = (px == middle.getX() && py == middle.getY());
-    bool onEnd = (px == end.getX() && py == end.getY());
+    bool onStart = (px == start.getX() && py == start.getY());   // המיקום של ה-W
+    bool onMiddle = (px == middle.getX() && py == middle.getY()); // המיקום של ה-w האמצעי
+    bool onEnd = (px == end.getX() && py == end.getY());         // המיקום של ה-w בקצה
 
     if (!onStart && !onMiddle && !onEnd)
-        return true; // Should normally never happen if isAtPosition was checked
+        return true;
 
-    // Must approach the spring from the opposite direction
+    // =========================================================
+    //                מצב תעופה (Flying - יציאה)
+    // =========================================================
+    // כשהשחקן משוגר, הוא עף מה-Start לכיוון ה-End.
+    // אנחנו ננצל את המעבר הזה כדי "לאפס" את המקפצה מאחוריו.
+    if (p.isFlying())
+    {
+        if (onStart) {
+            start.setChar('w'); // נראה מכווץ כשאנחנו עליו
+        }
+        else if (onMiddle) {
+            middle.setChar('w');
+            start.setChar('W');  // עזבנו את ה-Start, אז הוא חוזר להיות W גדול
+        }
+        else if (onEnd) {
+            end.setChar('w');
+            middle.setChar('w'); // עזבנו את האמצע, הוא חוזר להיות w קטן
+            start.setChar('W');  // ליתר ביטחון
+        }
+        return true;
+    }
+
+    // =========================================================
+    //                מצב הליכה (Walking - כניסה)
+    // =========================================================
+
+    // 1. בדיקת כיוון: חובה לבוא *נגד* הכיוון של הקפיץ כדי לדרוך אותו.
+    // אם הקפיץ יורה ימינה, צריך ללכת שמאלה כדי להיכנס אליו.
     Direction neededDir = Spring::oppositeDirection(direction);
-    bool correctEntry = (p.getDirection() == neededDir);
 
-    // If entering from wrong direction (and not already flying) → block
-    if (!correctEntry && !p.isFlying())
-        return false;
+    if (p.getDirection() != neededDir)
+    {
+        return false; // חסימה! (מתנהג כמו קיר אם באים מהצד או מהכיוון הלא נכון)
+    }
 
-    // Compression behavior
+    // 2. כניסה לקפיץ (מהקצה לבסיס)
+
+    if (onEnd) {
+        end.setChar('_'); // אנימציית כיווץ של הקצה
+        return true;      // מאפשרים לעבור
+    }
+
+    if (onMiddle) {
+        middle.setChar('_'); // אנימציית כיווץ של האמצע
+        return true;         // מאפשרים לעבור
+    }
+
+    // 3. הגעה לבסיס (Start / W) - כאן העצירה!
     if (onStart)
     {
-        if (p.isLoaded() || p.isFlying())
-        {
-            start.setChar('w');   // light compression animation
-            return true;
-        }
-        start.setChar('_');       // full compression
-        return true;
-    }
-
-    if (onMiddle)
-    {
-        if (p.isLoaded() || p.isFlying())
-        {
-            middle.setChar('w');
-            return true;
-        }
-        middle.setChar('_');
-        return true;
-    }
-
-    // Reached final segment → fully compressed spring
-    if (onEnd)
-    {
+        // כיווץ ויזואלי של כל הקפיץ
         start.setChar('_');
         middle.setChar('_');
+        end.setChar('_');
 
-        // Load player for launching
+        // עצירה וטעינה
         loadSpring(p);
+        return true;
     }
 
     return true;
 }
-
 /* ----------------------------------------------------
                 LOAD PLAYER FOR LAUNCH
    ---------------------------------------------------- */

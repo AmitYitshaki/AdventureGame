@@ -1,156 +1,325 @@
 ﻿#include "LevelLoader.h"
+#include "Switch.h"
+#include "Laser.h"
+#include "Door.h"
+#include "Key.h"
+#include "Torch.h"
+#include "spring.h"
+#include "Direction.h"
+// #include "Riddle.h"
+
 #include <fstream>
 #include <iostream>
-#include <string>
+#include <sstream>
 
-// Include your specific game objects
-#include "Key.h"
-#include "Riddle.h"
-#include "Door.h"
-#include "Torch.h"
-// #include "Spring.h" // בהמשך תוסיף את זה
+// =========================================================
+//            מימוש פונקציות העזר (Private)
+// =========================================================
 
-// --- פונקציית עזר 1: טיפול במיקום התחלתי של שחקנים ---
-void LevelLoader::handlePlayerStartPosition(char c, int x, int y, Screen& screen)
+GameObject* LevelLoader::findObjectAt(int x, int y, const std::vector<GameObject*>& gameObjects)
 {
-    if (c == '$') {
-        screen.setStartPos1(x, y);
+    for (GameObject* obj : gameObjects) {
+        if (obj->isAtPosition(x, y)) {
+            return obj;
+        }
     }
-    else if (c == '&') {
-        screen.setStartPos2(x, y);
+    return nullptr;
+}
+
+void LevelLoader::scanDirection(int startX, int startY, int dx, int dy, char type,
+    const std::vector<GameObject*>& allObjects,
+    std::vector<GameObject*>& outputBeam)
+{
+    int currX = startX + dx;
+    int currY = startY + dy;
+
+    while (true)
+    {
+        GameObject* obj = findObjectAt(currX, currY, allObjects);
+        Laser* neighbor = dynamic_cast<Laser*>(obj);
+
+        // אם מצאנו שכן שהוא לייזר מאותו סוג
+        if (neighbor != nullptr && neighbor->getChar() == type)
+        {
+            outputBeam.push_back(neighbor);
+            currX += dx;
+            currY += dy;
+        }
+        else
+        {
+            break; // שרשרת נקטעה
+        }
     }
 }
 
-// --- פונקציית עזר 2: יצירת אובייקט חכם ---
-// שים לב: אנחנו צריכים רק את ה-ScreenId כדי ליצור את האובייקט
+std::vector<GameObject*> LevelLoader::collectLaserBeam(Laser* startNode, const std::vector<GameObject*>& allObjects)
+{
+    std::vector<GameObject*> beam;
+    beam.push_back(startNode);
+
+    char type = startNode->getChar();
+    int x = startNode->getX();
+    int y = startNode->getY();
+
+    if (type == '-') {
+        scanDirection(x, y, -1, 0, '-', allObjects, beam);
+        scanDirection(x, y, 1, 0, '-', allObjects, beam);
+    }
+    else if (type == '|') {
+        scanDirection(x, y, 0, -1, '|', allObjects, beam);
+        scanDirection(x, y, 0, 1, '|', allObjects, beam);
+    }
+
+    return beam;
+}
+
+// בתוך LevelLoader.cpp -> parseConnectCommand
+
+void LevelLoader::parseConnectCommand(const std::string& line, std::vector<GameObject*>& gameObjects)
+{
+    std::stringstream ss(line);
+    std::string command;
+    int switchX, switchY, targetX, targetY;
+
+    ss >> command >> switchX >> switchY >> targetX >> targetY;
+
+    GameObject* objSwitch = findObjectAt(switchX, switchY, gameObjects);
+    GameObject* objTarget = findObjectAt(targetX, targetY, gameObjects);
+
+    Switch* mySwitch = dynamic_cast<Switch*>(objSwitch);
+
+    // הדפסה 2: האם מצאנו את המתג?
+    if (mySwitch == nullptr) {
+        return;
+    }
+
+    if (objTarget != nullptr)
+    {
+        Laser* laserTarget = dynamic_cast<Laser*>(objTarget);
+        if (laserTarget != nullptr)
+        {
+            auto beam = collectLaserBeam(laserTarget, gameObjects);
+
+            for (GameObject* part : beam) {
+                mySwitch->addTarget(part);
+            }
+        }
+        else
+        {
+            mySwitch->addTarget(objTarget);
+        }
+    }
+    else {
+    }
+}
+void LevelLoader::parseSpringData(const std::string& line, std::vector<GameObject*>& gameObjects)
+{
+    std::stringstream ss(line);
+    std::string command;
+    int dataX, dataY;
+    char dirChar;
+    int screenIdInt;
+
+    // קריאת הנתונים מהשורה
+    ss >> command >> dataX >> dataY >> dirChar >> screenIdInt;
+
+    // 1. חיפוש האובייקט (שנוצר קודם כ-'W' גולמי)
+    GameObject* obj = findObjectAt(dataX, dataY, gameObjects);
+
+    if (obj == nullptr) {
+        return;
+    }
+
+    // 2. המרה ל-Spring
+    Spring* spring = dynamic_cast<Spring*>(obj);
+    if (spring == nullptr) {
+        return;
+    }
+
+    // 3. המרת התו לכיוון
+    Direction dir = Direction::STAY;
+    switch (dirChar)
+    {
+    case 'U': dir = Direction::UP; break;
+    case 'D': dir = Direction::DOWN; break;
+    case 'L': dir = Direction::LEFT; break;
+    case 'R': dir = Direction::RIGHT; break;
+    }
+
+    // 4. עדכון המקפצה (כאן נקראת setDirection החדשה שפורסת את המקפצה)
+    spring->setDirection(dir);
+
+    // אופציונלי: הדפסת אישור שקטה ללוג
+    // std::cout << "Spring loaded at (" << dataX << "," << dataY << ")" << std::endl;
+}
+// פונקציה לקריאת נתוני דלת: DOOR_DATA <x> <y> <id> <target_screen_id> <locked(0/1)>
+void LevelLoader::parseDoorData(const std::string& line, std::vector<GameObject*>& gameObjects)
+{
+    std::stringstream ss(line);
+    std::string command;
+    int x, y, id, targetScreenInt, lockedInt;
+
+    ss >> command >> x >> y >> id >> targetScreenInt >> lockedInt;
+
+
+    // מציאת הדלת במיקום הזה
+    GameObject* obj = findObjectAt(x, y, gameObjects);
+    Door* door = dynamic_cast<Door*>(obj);
+
+    if (door != nullptr)
+    {
+        // המרת int ל-ScreenId (בהנחה שזה Enum או int)
+        ScreenId targetId = static_cast<ScreenId>(targetScreenInt);
+
+        // עדכון הדלת
+        door->setDoorProperties(id, targetId, (lockedInt == 1));
+    }
+}
+
+void LevelLoader::parseKeyData(const std::string& line, std::vector<GameObject*>& gameObjects)
+{
+    std::stringstream ss(line);
+    std::string command;
+    int x, y, id;
+
+    ss >> command >> x >> y >> id;
+
+    // 1. מציאת האובייקט במיקום
+    GameObject* obj = findObjectAt(x, y, gameObjects);
+
+    if (obj == nullptr)
+    {
+        return;
+    }
+
+    // 2. המרה למפתח
+    Key* key = dynamic_cast<Key*>(obj);
+
+    // 3. עדכון ה-ID
+    if (key != nullptr)
+    {
+        key->setKeyID(id);
+    }
+    else
+    {}
+}
 void LevelLoader::createObject(char c, int x, int y, ScreenId screenId, std::vector<GameObject*>& gameObjects)
 {
-    // חישוב מזהה מבוסס על המסך הנוכחי
-    // המרה ל-int כדי שיוכל להיכנס לשדות של Key ו-Door
-    int currentLevelID = (int)screenId;
-
-    // חישוב "החדר הבא" באופן אוטומטי
-    // (הנחה: החדרים ב-Enum מסודרים עוקב: ROOM1, ROOM2, ROOM3...)
-    ScreenId nextLevelID = (ScreenId)(currentLevelID + 1);
-
     switch (c)
     {
+    case '/':
+        gameObjects.push_back(new Switch(x, y, screenId));
+        break;
+    case '-':
+    case '|':
+        gameObjects.push_back(new Laser(x, y, c, screenId));
+        break;
+    case '0': case '1': case '2': case '3': case '4':
+    case '5': case '6': case '7': case '8': case '9': // דלתות ממוספרות
+        // יוצרים דלת עם ערכי ברירת מחדל (יתעדכנו ב-metadata)
+        gameObjects.push_back(new Door(x, y, c, screenId, -1, ScreenId::ROOM1, false));
+        break;
     case 'K':
-        // המפתח מקבל את ה-ID של החדר הנוכחי
-        gameObjects.push_back(new Key(x, y, 'K', screenId, currentLevelID));
+        // יוצרים מפתח עם ID זמני (-1). הנתונים האמיתיים יגיעו בסוף הקובץ.
+        gameObjects.push_back(new Key(x, y, 'K', screenId, -1));
         break;
-
-    case 'D':
-        // הדלת ננעלת עם ה-ID של החדר הנוכחי
-        // והיא מובילה לחדר הבא (nextLevelID)
-        gameObjects.push_back(new Door(x, y, 'D', screenId, currentLevelID, nextLevelID, true));
+	case '!':
+		 gameObjects.push_back(new Torch(x, y,'!' ,screenId));
+		 break;
+    case 'W':
+        // יוצרים מקפצה "גולמית" - כל החלקים באותה משבצת, ללא כיוון מוגדר.
+        // הפונקציה parseSpringData תעדכן אותה אחר כך ותפרוס אותה לכיוון הנכון.
+        gameObjects.push_back(new Spring(
+            Point(x, y, 'W'),   // Start
+            Point(x, y, 'w'),   // Middle (זמני - באותו מקום)
+            Point(x, y, 'w'),   // End (זמני - באותו מקום)
+            Direction::STAY,    // Direction (זמני)
+            screenId));
         break;
-
-    case '?':
-        gameObjects.push_back(new Riddle(x, y, screenId, RiddleId::RIDDLE1));
-        break;
-
-    case '!':
-        gameObjects.push_back(new Torch(x, y, '!', screenId));
+    default:
         break;
     }
 }
 
-void LevelLoader::loadScreenFromFile(const std::string& fileName, Screen& screenToFill)
+// =========================================================
+//            המ implementation הראשי (Public)
+// =========================================================
+
+void LevelLoader::loadLevelFromFile(const std::string& fileName, Screen& screen, std::vector<GameObject*>& gameObjects)
 {
     std::ifstream file(fileName);
-    if (!file.is_open()) {
-        std::cerr << "Error: Could not open screen file: " << fileName << std::endl;
+    if (!file) {
+        std::cerr << "Error loading level: " << fileName << std::endl;
         return;
     }
 
-    std::vector<std::string> newLayout;
-    std::string line;
-
-    // קריאה פשוטה: שורה אחר שורה
-    while (std::getline(file, line))
-    {
-        // אופציונלי: חיתוך או הרחבה לרוחב המסך כדי למנוע בעיות תצוגה
-        if (line.size() < Screen::WIDTH) {
-            line.resize(Screen::WIDTH, ' ');
-        }
-
-        newLayout.push_back(line);
-    }
-
-    file.close();
-    screenToFill.setLayout(newLayout);
-}
-// --- הפונקציה הראשית לטעינת השלב ---
-void LevelLoader::loadLevelFromFile(
-    const std::string& fileName,
-    Screen& screenToFill,
-    std::vector<GameObject*>& gameObjects)
-{
-    std::ifstream file(fileName);
-
-    // בדיקת שגיאה בפתיחה
-    if (!file.is_open()) {
-        std::cerr << "Error: Could not open file " << fileName << std::endl;
-        return;
-    }
-
-    std::vector<std::string> newLayout;
     std::string line;
     int row = 0;
-
-    // ברירת מחדל: החדר מואר
-    screenToFill.setDark(false);
-
-	//reading the first line without processing(objects or players)
-	std::getline(file, line);
-    newLayout.push_back(line);
-    row++;
+    ScreenId currentScreenId = screen.getScreenId();
+	if (std::getline(file, line)) {
+		screen.setLine(0, line); // קריאת השורה הראשונה מבלי לחפש אובייקטים
+		row++;
+	}
 
     while (std::getline(file, line))
     {
-        // --- חלק א: קריאת המפה (שורות 0-24) ---
         if (row < Screen::HEIGHT)
         {
-            // מוודאים שהשורה ברוחב המתאים
-            if (line.size() < Screen::WIDTH) {
-                line.resize(Screen::WIDTH, ' ');
-            }
-
-            // סריקה תו-תו
+            screen.setLine(row, line);
             for (size_t col = 0; col < line.size(); ++col)
             {
                 char c = line[col];
 
-                if (c != ' ' && c != '#')
-                {
-                    // 1. טיפול בשחקנים
-                    if (c == '$' || c == '&')
-                    {
-                        handlePlayerStartPosition(c, (int)col, row, screenToFill);
-                        line[col] = ' '; // מנקים מהקיר
-                    }
-                    else {
-                        createObject(c, (int)col, row, screenToFill.getScreenId(), gameObjects);
-                        line[col] = ' '; // מנקים מהקיר
-                    }
+                if (c != ' ' && c != '#') {
+                    if (c == '$') { screen.setStartPos1((int)col, row); screen.setChar((int)col, row, ' ');}
+                    else if (c == '&') { screen.setStartPos2((int)col, row); screen.setChar((int)col, row, ' ');}
+                    else { createObject(c, (int)col, row, currentScreenId, gameObjects); screen.setChar((int)col, row, ' ');}
                 }
             }
-            newLayout.push_back(line);
         }
-        // --- חלק ב: קריאת נתונים נוספים (Metadata) ---
-        else
+        else // Metadata Area
         {
-            // בדיקה האם החדר חשוך
-            if (line.find("DARK") != std::string::npos) {
-                screenToFill.setDark(true);
+            if (line.find("CONNECT") == 0)
+            {
+                parseConnectCommand(line, gameObjects);
+            }
+            else if (line.find("DOOR_DATA") == 0) { // זיהוי הפקודה החדשה
+                parseDoorData(line, gameObjects);
+            }
+            else if (line.find("KEY_DATA") == 0) {
+                parseKeyData(line, gameObjects);
+            }
+            else if (line.find("DARK") != std::string::npos)
+            {
+                screen.setDark(true);
+            }
+            else if (line.find("SPRING_DATA") == 0) {
+                parseSpringData(line, gameObjects);
             }
         }
-      row++;
+        row++;
+    }
+    file.close();
+}
+
+// פונקציה לטעינת מסך "טיפש" (רק גרפיקה, בלי לוגיקה)
+void LevelLoader::loadScreenFromFile(const std::string& fileName, Screen& screen)
+{
+    std::ifstream file(fileName);
+    if (!file) {
+        // אם לא מצאנו את הקובץ, אפשר להדפיס שגיאה או פשוט להתעלם
+        return;
+    }
+
+    std::string line;
+    int row = 0;
+
+    // קוראים שורה-שורה ומדביקים למסך
+    while (std::getline(file, line) && row <= Screen::HEIGHT)
+    {
+        screen.setLine(row, line);
+        row++;
     }
 
     file.close();
-
-    // עדכון המסך בציור הסופי
-    screenToFill.setLayout(newLayout);
 }

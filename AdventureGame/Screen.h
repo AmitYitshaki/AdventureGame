@@ -69,6 +69,22 @@ public:
     Point getStartPos1() const { return startPos1; }
     Point getStartPos2() const { return startPos2; }
 
+    void setLine(int row, const std::string& line)
+    {
+        if (row >= 0 && row < HEIGHT) {
+            if (layout.size() < HEIGHT)
+                layout.resize(HEIGHT, std::string(WIDTH, ' '));
+            layout[row] = line;
+        }
+    }
+    void setChar(int x, int y, char c)
+    {
+        if (y >= 0 && y < layout.size() &&
+            x >= 0 && x < layout[y].size()) {
+            layout[y][x] = c;
+        }
+	}
+
 private:
     ScreenId screenID = ScreenId::HOME;
 	std::vector<std::string> layout; // vector of strings for dynamic access

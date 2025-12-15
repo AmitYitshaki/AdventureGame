@@ -25,8 +25,9 @@ public:
         screenID(screen),
         solid(solid),
         collected(collected)
-    {
-    }
+    {}
+
+
 
     virtual ~GameObject() {}
 
@@ -57,6 +58,9 @@ public:
     // Soft-remove from world (move off-screen)
     virtual void removeFromGame();
 
+	// Receive a signal from Switch object (default: do nothing)
+    virtual void receiveSignal(bool state) {} 
+
     // ------------------------------------------------------------
     //                       ACCESSORS
     // ------------------------------------------------------------
@@ -75,6 +79,8 @@ public:
 
     // Update position on the map
     void setPosition(int x, int y) { point.setPos(x, y); }
+
+	void setChar(char newC);
 
     // Check if object occupies (x,y)
     virtual bool isAtPosition(int x, int y) const

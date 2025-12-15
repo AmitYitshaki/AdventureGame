@@ -20,6 +20,8 @@ public:
     Door(int x, int y, char c, ScreenId screen,
         int id, ScreenId leadsToScreen, bool isLocked);
 
+    void setDoorProperties(int id, ScreenId targetScreen, bool isLocked);
+
     bool isLocked() const { return locked; }
     ScreenId getLeadsTo() const { return leadsTo; }
 

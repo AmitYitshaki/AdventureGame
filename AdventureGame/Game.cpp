@@ -38,7 +38,7 @@ void Game::initGame()
 
     // טעינת מסך הוראות (כדי שאפשר יהיה לצפות בהן לפני שמתחילים לשחק)
     screens[(int)ScreenId::INSTRUCTIONS] = Screen(ScreenId::INSTRUCTIONS);
-    LevelLoader::loadScreenFromFile("Instructions.txt", screens[(int)ScreenId::INSTRUCTIONS]);
+    LevelLoader::loadScreenFromFile("InstructionsScreen.txt", screens[(int)ScreenId::INSTRUCTIONS]);
 
     currentScreen = &screens[(int)ScreenId::HOME];
 }
@@ -420,7 +420,7 @@ void Game::checkLevelTransition()
     ScreenId t1 = player1.getCurrentLevel();
     ScreenId t2 = player2.getCurrentLevel();
     ScreenId real = currentScreen->getScreenId();
-
+ 
     if (t1 != real && t2 == real){
         setStatusMessage("Player 1 witting in next Room!");
 	    player1.updatepoint(-1, -1); //move player off-screen to avoid multiple triggers
