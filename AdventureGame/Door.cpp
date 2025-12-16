@@ -3,24 +3,8 @@
 #include "Key.h"
 #include <iostream>
 #include <string>
-
-// שים לב: וודא שיש לך כאן את ה-include לפונקציה gotoxy
-// בדרך כלל זה אחד מאלה:
-// #include "io_utils.h" 
-// #include "Utils.h"
-// או אם זה מוגדר ב-Screen:
 #include "Screen.h" 
 
-// פונקציית עזר קטנה לדיבאג נקי (אם אין לך gotoxy גלובלי, תצטרך להוסיף את ה-include המתאים)
-void printDebugBelow(const std::string& msg)
-{
-    // נניח שהגובה הוא 24, נדפיס בשורה 26 כדי לא להפריע
-    // אם gotoxy לא מזוהה, תוסיף את ה-include המתאים מהפרויקט שלך
-    gotoxy(0, 26);
-
-    // מדפיסים את ההודעה + הרבה רווחים כדי למחוק טקסט קודם שהיה שם
-    std::cout << "DOOR DEBUG: " << msg << "                                         " << std::endl;
-}
 
 Door::Door(int x, int y, char c, ScreenId screen,
     int id, ScreenId leadsToScreen, bool isLocked)
