@@ -42,12 +42,13 @@ static void putPointToBuffer(std::vector<std::string>& buffer, const Point& pt)
 //                   CONSTRUCTOR
 // =========================================================
 
-Spring::Spring(const Point& startPt, const Point& middlePt, const Point& endPt, Direction dir, ScreenId screenId)
+Spring::Spring(const Point& startPt, const Point& middlePt, const Point& endPt, Direction dir, ScreenId screenId,int springLength)
     : GameObject(endPt.getX(), endPt.getY(), 'W', screenId, false, false),
     start(startPt),
     middle(middlePt),
     end(endPt),
-    direction(dir)
+    direction(dir),
+    springLength(springLength)
 {
     // חישוב ושמירה של הכיוון ההפוך כבר ביצירה
     this->oppositeDir = oppositeDirection(dir);
@@ -187,6 +188,7 @@ void Spring::loadSpring(Player& p)
 {
     p.stopMovement();
     p.setLoaded(true);
+
     p.setLaunchDirection(direction);
     p.setLoadedSpringLen(getLength());
 }

@@ -115,7 +115,13 @@ void Game::writeToBuffer(std::vector<std::string>& buffer, int x, int y, char c)
 void Game::writeTextToBuffer(std::vector<std::string>& buffer, int x, int y, const std::string& text)
 {
     for (size_t i = 0; i < text.size(); ++i)
-        writeToBuffer(buffer, x + (int)i, y, text[i]);
+    {
+        // רק אם התו אינו רווח, אנחנו דורסים את מה שמתחתיו
+        // זה מאפשר לראות את הרצפה בין המילים
+        if (text[i] != ' ') {
+            writeToBuffer(buffer, x + (int)i, y, text[i]);
+        }
+    }
 }
 
 void Game::drawObjectsToBuffer(std::vector<std::string>& buffer)
@@ -145,14 +151,28 @@ void Game::drawPlayersToBuffer(std::vector<std::string>& buffer)
     writeToBuffer(buffer, player1.getX(), player1.getY(), player1.getChar());
     writeToBuffer(buffer, player2.getX(), player2.getY(), player2.getChar());
 
-    writeToBuffer(buffer, player1.getHudX() - 7, player1.getHudY(), player1.getLive() + '0');
-    writeToBuffer(buffer, player2.getHudX() - 7, player2.getHudY(), player2.getLive() + '0');
+    // --- עיצוב חדש וקומפקטי ל-HUD ---
+    // P1: HP:3 Key
+    std::string p1Text = "P1: HP:" + std::to_string(player1.getLive());
+    if (player1.hasItem()) {
+        p1Text += " Itm:";
+        p1Text += player1.getItemChar();
+    }
+
+    std::string p2Text = "P2: HP:" + std::to_string(player2.getLive());
+    if (player2.hasItem()) {
+        p2Text += " Itm:";
+        p2Text += player2.getItemChar();
+    }
+
+    writeTextToBuffer(buffer, player1.getHudX(), player1.getHudY(), p1Text);
+    writeTextToBuffer(buffer, player2.getHudX(), player2.getHudY(), p2Text);
 }
 
 void Game::drawStatusToBuffer(std::vector<std::string>& buffer)
 {
     if (!statusMessage.empty())
-        writeTextToBuffer(buffer, 45, 0, statusMessage);
+        writeTextToBuffer(buffer, 20, 0, statusMessage); // מיקום מרכזי יותר
 }
 
 void Game::drawRiddle(std::vector<std::string>& buffer)
@@ -251,40 +271,31 @@ void Game::draw()
 
 void Game::update()
 {
-    int steps1 = player1.isFlying() ? 3 : 1;
-    int steps2 = player2.isFlying() ? 3 : 1;
+    // --- תיקון: שימוש במהירות האמיתית של השחקן (תומך בקפיץ) ---
+    int steps1 = player1.isFlying() ? player1.getSpeed() : 1;
+    int steps2 = player2.isFlying() ? player2.getSpeed() : 1;
 
-    // Player 1
-    for (int i = 0; i < steps1; ++i)
-    {
-        player1.move(*currentScreen, gameObjects, &player2);
+    for (int i = 0; i < steps1; ++i) {
+        player1.move(*currentScreen, gameObjects);
         if (!player1.isFlying()) break;
     }
-
-    // Player 2
-    for (int i = 0; i < steps2; ++i)
-    {
-         player2.move(*currentScreen, gameObjects, &player1);
+    for (int i = 0; i < steps2; ++i) {
+        player2.move(*currentScreen, gameObjects);
         if (!player2.isFlying()) break;
     }
 
     if (player1.isFlying()) player1.updateSpringEffect();
     if (player2.isFlying()) player2.updateSpringEffect();
 
-    // Only check transitions inside actual rooms
     if (currentScreen->getScreenId() != ScreenId::HOME &&
         currentScreen->getScreenId() != ScreenId::INSTRUCTIONS)
         checkLevelTransition();
 
     checkIsPlayerLoaded();
 
-    // Riddle trigger
-    if (!RiddleMode && checkPlayerHasRiddle())
-    {
-        if (player1.hasRiddle())
-            startRiddle(player1.getHeldRiddle(), player1);
-        else if (player2.hasRiddle())
-            startRiddle(player2.getHeldRiddle(), player2);
+    if (!RiddleMode && checkPlayerHasRiddle()) {
+        if (player1.hasRiddle()) startRiddle(player1.getHeldRiddle(), player1);
+        else if (player2.hasRiddle()) startRiddle(player2.getHeldRiddle(), player2);
     }
 }
 
@@ -506,6 +517,21 @@ void Game::goToScreen(ScreenId id)
 {
     // 1. עדכון המסך הנוכחי
     currentScreen = &screens[(int)id];
+
+    if (currentScreen->hasLegendDefined())
+    {
+        Point legendPos = currentScreen->getLegendStart();
+
+        player1.setHudPosition(legendPos.getX(), legendPos.getY());
+
+        player2.setHudPosition(legendPos.getX() + 20, legendPos.getY());
+    }
+    else
+    {
+        // ברירת מחדל למסכים ללא L (כמו תפריט ראשי)
+        player1.setHudPosition(0, 0);
+        player2.setHudPosition(0, 1);
+    }
 
     // 2. שליפת נקודות ההתחלה שה-LevelLoader שמר בתוך המסך
     Point start1 = currentScreen->getStartPos1();

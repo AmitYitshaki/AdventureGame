@@ -25,7 +25,8 @@ public:
         const Point& middlePt,
         const Point& endPt,
         Direction dir,
-        ScreenId screenId);
+        ScreenId screenId,
+        const int springLength);
 
     // --- Drawing ---
     void drawToBuffer(std::vector<std::string>& buffer) const;
@@ -37,7 +38,8 @@ public:
     // --- Spring Properties ---
     Direction getDirection() const { return direction; }
     Direction getOppositeDirection() const { return oppositeDir; }
-    int getLength() const { return 3; }
+    int getLength() const { return springLength; }
+	void setLength(int length) { springLength = length; }
 
     // Helper: calculate opposite direction
     static Direction oppositeDirection(Direction d);
@@ -49,7 +51,7 @@ private:
     Point middle;
     Point end;
     Direction direction;
-
+    int springLength;
     // Member to cache the opposite direction (optimization)
     Direction oppositeDir;
 

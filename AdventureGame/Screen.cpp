@@ -1,28 +1,19 @@
 ﻿#include "Screen.h"
+#include "Utils.h" // For gotoxy
 #include <iostream>
 
 /*
     Screen.cpp
-    Holds the ASCII layouts of all screens and implements
-    basic drawing and initialization logic.
+    Holds the implementation of the draw function.
+    Constructors and setters are now inline in Screen.h
 */
-
-Screen::Screen() // Default constructor → HOME screen
-{
-    screenID = ScreenId::HOME;
-}
-
-Screen::Screen(ScreenId id)
-    : screenID(id)
-{}
 
 void Screen::draw() const
 {
+    // הזזה לתחילת המסך וציור כל השורות
     gotoxy(0, 0);
     for (const auto& line : layout)
     {
-        std::cout << line<< '\n';
+        std::cout << line << '\n';
     }
 }
-
-

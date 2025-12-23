@@ -132,7 +132,7 @@ void Player::move(Screen& screen, std::vector<GameObject*>& gameObjects, const P
             if (!allowed)
             {
                 // Undo movement
-                point.move(-dx * speed, -dy * speed);
+                point.move(-dx, -dy);
                 dir = Direction::STAY;
             }
         }
@@ -225,20 +225,21 @@ void Player::moveFlying(Screen& screen, std::vector<GameObject*>& gameObjects, c
                     SPRING LAUNCH
    ---------------------------------------------------- */
 
-void Player::launch(int springLen)
+void Player::launch(int springLength)
 {
-    // springLen = N, startSpringEffect computes N^2
-    startSpringEffect(springLen);
+    // springLength = N, startSpringEffect computes N^2
+    startSpringEffect(springLength);
 }
 
-void Player::startSpringEffect(int springLen)
+void Player::startSpringEffect(int springLength)
 {
     // Duration = N^2 game cycles
-    springTicksLeft = springLen * springLen;
+    springTicksLeft = springLength * springLength;
 
     flying = true;
     loaded = false;
-    force = springLen;
+	speed = springLength;
+    force = springLength;
     dir = launchDirection; // lock initial launch direction
 }
 

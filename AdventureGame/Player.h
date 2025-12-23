@@ -118,6 +118,12 @@ public:
     // --- HUD ---
     int getHudX() const { return hudX; }
     int getHudY() const { return hudY; }
+    void setHudPosition(int x, int y)
+    {
+        hudX = x;
+        hudY = y;
+    }
+
 
     // --- inventory / items ---
     bool hasItem() const { return heldItem != nullptr; }
