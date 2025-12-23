@@ -10,6 +10,8 @@ private:
 public:
     Laser(int x, int y, char c, ScreenId screen);
 
+    bool isActive() const { return active; }
+
     // קבלת אות מהמתג: הופך את המצב (Toggle)
     void receiveSignal(bool state) override;
 

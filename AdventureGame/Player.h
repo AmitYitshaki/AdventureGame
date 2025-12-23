@@ -98,7 +98,7 @@ public:
     void move(Screen& screen, std::vector<GameObject*>& gameObjects);
     void moveFlying(Screen& screen, std::vector<GameObject*>& gameObjects);
     void launch(int springLen); // start spring effect based on spring length
-
+    int getSpeed() { return speed; }
     bool isFlying() const { return flying; }
     void setFlying(bool canFly) { flying = canFly; }
 
@@ -111,6 +111,7 @@ public:
     void startSpringEffect(int power);   // power = N (spring length)
     void updateSpringEffect();           // decrement ticks; stop at 0
     void stopSpringEffect();             // reset flying state
+    int getSpeed() const { return speed; }
 
     // --- HUD ---
     int getHudX() const { return hudX; }
@@ -128,7 +129,7 @@ public:
     bool hasTorch() const;
     bool hasRiddle() const;
     Riddle* getHeldRiddle() const;
-
+    char getItemChar() const;
     // --- life system ---
     void decreaseLife();
     int getLive() const { return live; }

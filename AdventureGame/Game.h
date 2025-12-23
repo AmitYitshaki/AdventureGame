@@ -15,6 +15,7 @@
 #include "Torch.h"
 #include "Riddle.h"
 #include "LevelLoader.h"
+#include "Logger.h"
 
 /*
     Game:
@@ -64,6 +65,8 @@ private:
     Riddle* currentRiddle = nullptr;
     Player* currentRiddlePlayer = nullptr;
 
+    bool debugMode = false; 
+
     static std::string statusMessage;
 
     // ============================================================
@@ -79,7 +82,8 @@ private:
     void drawStatusToBuffer(std::vector<std::string>& buffer);
     void drawRiddle(std::vector<std::string>& buffer);
     void renderBuffer(const std::vector<std::string>& buffer);
-
+    void drawDebugDashboard();
+    bool isDebugMode() { return debugMode; }
     void applyLighting(std::vector<std::string>& buffer);
 
     // ============================================================
@@ -88,7 +92,7 @@ private:
 
     void ChangeDirection(char c);
     void handleRiddleInput(char key);
-
+    void setDebugMode(bool adminUse);
     // ============================================================
     //                     GAMEPLAY MECHANICS
     // ============================================================

@@ -11,6 +11,8 @@ private:
 public:
     Switch(int x, int y, ScreenId screen);
 
+    bool isActive() const { return active; }
+
     // חיבור לייזר למתג (נקרא ע"י CONNECT)
     void addTarget(GameObject* obj);
 

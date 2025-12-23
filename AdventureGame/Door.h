@@ -24,7 +24,7 @@ public:
 
     bool isLocked() const { return locked; }
     ScreenId getLeadsTo() const { return leadsTo; }
-
+    int getId() const { return doorID; }
     bool unlock(Player& player);                 // Try unlocking using player's key
     bool handleCollision(Player& p, const Screen& screen) override;
 };

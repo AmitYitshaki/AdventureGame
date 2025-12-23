@@ -1,6 +1,7 @@
 ﻿#include "Game.h"
 #include <conio.h>
 #include <iostream>
+#include <cstdlib>
 
 // Static HUD message
 std::string Game::statusMessage = "";
@@ -13,8 +14,10 @@ Game::Game()
     : player1(0, 0, '$', 16), // מאתחלים עם ערכים זמניים, הטעינה תדרוס אותם
     player2(0, 0, '&', 35),
     isRunning(true),
-    currentScreen(nullptr)
+    currentScreen(nullptr),
+    debugMode(false)
 {
+    system("mode con: cols=80 lines=50");
     initGame();
 }
 
@@ -189,6 +192,39 @@ void Game::renderBuffer(const std::vector<std::string>& buffer)
     std::cout.flush();
 }
 
+void Game::drawDebugDashboard()
+{
+    // מיקום: שורה 26 (מתחת למסך המשחק)
+    int y = Screen::HEIGHT + 1;
+
+    // שורה 1: נתוני שחקנים + חדר
+    gotoxy(0, y);
+    std::cout << "P1:" << Logger::getPlayerInfo(player1) << " | "
+        << "P2:" << Logger::getPlayerInfo(player2) << " | "
+        << Logger::getScreenInfo(*currentScreen) << std::string(20, ' '); // רווחים לניקוי שאריות
+
+    // שורה 2: אובייקטים בחדר (בשורה אחת ארוכה)
+    gotoxy(0, y + 1);
+    std::cout << "Objs: ";
+
+    std::vector<std::string> objs = Logger::getScreenObjectsList(gameObjects, currentScreen->getScreenId());
+
+    if (objs.empty()) {
+        std::cout << "None";
+    }
+    else {
+        for (const auto& s : objs) {
+            std::cout << s << " "; // מדפיס אובייקטים ברצף: Dr#1(L)(10,10) Ky#2(5,5) ...
+        }
+    }
+
+    // מנקה את שאר השורה למקרה שנשארו שאריות מאובייקטים קודמים
+    std::cout << std::string(40, ' ');
+
+    // החזרת סמן להתחלה למניעת בעיות
+    gotoxy(0, 0);
+}
+
 void Game::draw()
 {
     auto buffer = initBuffer();
@@ -202,6 +238,9 @@ void Game::draw()
         drawRiddle(buffer);
 
     renderBuffer(buffer);
+
+    if (isDebugMode())
+        drawDebugDashboard();
 }
 
 /* ============================================================
@@ -256,6 +295,11 @@ void Game::handleInput()
     if (!_kbhit()) return;
 
     char key = _getch();
+
+    if (key == '9'){
+        setDebugMode(!isDebugMode());
+        return;
+    }
 
     // If riddle mode → restrict input
     if (RiddleMode && currentRiddle)
@@ -346,6 +390,25 @@ void Game::ChangeDirection(char c)
 void Game::setStatusMessage(const std::string& msg)
 {
     statusMessage = msg;
+}
+
+void Game::setDebugMode(bool adminUse)
+{
+    debugMode = adminUse;
+
+    // If debug turned off, clear the debug dashboard lines we previously drew
+    if (!debugMode)
+    {
+        int y = Screen::HEIGHT + 1; // dashboard top row
+        for (int i = 0; i < 3; ++i) // clear 3 rows (same area used by drawDebugDashboard)
+        {
+            gotoxy(0, y + i);
+            std::cout << std::string(Screen::WIDTH, ' ');
+        }
+        // restore cursor to top-left to avoid drawing artifacts
+        gotoxy(0, 0);
+        std::cout.flush();
+    }
 }
 
 /* ============================================================

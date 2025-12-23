@@ -298,6 +298,11 @@ Riddle* Player::getHeldRiddle() const
     return nullptr;
 }
 
+char Player::getItemChar() const
+{
+    return heldItem ? heldItem->getChar() : ' ';
+}
+
 /* ----------------------------------------------------
                         LIFE SYSTEM
    ---------------------------------------------------- */

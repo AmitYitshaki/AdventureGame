@@ -6,11 +6,26 @@
 
 /*
     Spring.cpp
-    Handles spring drawing, collision logic, compression animation,
-    and triggering of the player spring-loading behavior.
+    Handles spring logic and rendering.
 */
 
-// Helper: write single spring segment to output buffer
+// =========================================================
+//                   HELPER FUNCTIONS
+// =========================================================
+
+// Static helper to calculate opposite direction
+Direction Spring::oppositeDirection(Direction d)
+{
+    switch (d)
+    {
+    case Direction::UP:    return Direction::DOWN;
+    case Direction::DOWN:  return Direction::UP;
+    case Direction::LEFT:  return Direction::RIGHT;
+    case Direction::RIGHT: return Direction::LEFT;
+    default:               return Direction::STAY; // Should not happen for spring
+    }
+}
+
 static void putPointToBuffer(std::vector<std::string>& buffer, const Point& pt)
 {
     int x = pt.getX();
@@ -23,9 +38,24 @@ static void putPointToBuffer(std::vector<std::string>& buffer, const Point& pt)
     }
 }
 
-/* ----------------------------------------------------
-                        DRAWING
-   ---------------------------------------------------- */
+// =========================================================
+//                   CONSTRUCTOR
+// =========================================================
+
+Spring::Spring(const Point& startPt, const Point& middlePt, const Point& endPt, Direction dir, ScreenId screenId)
+    : GameObject(endPt.getX(), endPt.getY(), 'W', screenId, false, false),
+    start(startPt),
+    middle(middlePt),
+    end(endPt),
+    direction(dir)
+{
+    // חישוב ושמירה של הכיוון ההפוך כבר ביצירה
+    this->oppositeDir = oppositeDirection(dir);
+}
+
+// =========================================================
+//                     DRAWING
+// =========================================================
 
 void Spring::drawToBuffer(std::vector<std::string>& buffer) const
 {
@@ -34,42 +64,31 @@ void Spring::drawToBuffer(std::vector<std::string>& buffer) const
     putPointToBuffer(buffer, end);
 }
 
-/* ----------------------------------------------------
-                  POSITION & COLLISION
-   ---------------------------------------------------- */
+// =========================================================
+//                POSITION & SETUP
+// =========================================================
 
 bool Spring::isAtPosition(int x, int y) const
 {
-    return  (x == start.getX() && y == start.getY()) ||
+    return (x == start.getX() && y == start.getY()) ||
         (x == middle.getX() && y == middle.getY()) ||
         (x == end.getX() && y == end.getY());
 }
 
-Direction Spring::oppositeDirection(Direction d)
-{
-    switch (d)
-    {
-    case Direction::UP:    return Direction::DOWN;
-    case Direction::DOWN:  return Direction::UP;
-    case Direction::LEFT:  return Direction::RIGHT;
-    case Direction::RIGHT: return Direction::LEFT;
-    default:               return d;
-    }
-}
-
-// שומרים על בניית הקפיץ "קדימה" כדי שהציור יתאים
 void Spring::setDirection(Direction newDir)
 {
     direction = newDir;
+
+    // עדכון המטמון של הכיוון ההפוך
+    oppositeDir = oppositeDirection(newDir);
+
     int x = start.getX();
     int y = start.getY();
 
+    // סידור הנקודות לפי הכיוון החדש
     switch (direction)
     {
-    case Direction::UP:    // Body expands Down (launch up)
-        middle.setPos(x, y - 1); // תיקון: אם משגרים למעלה, הגוף צריך להיות למעלה (ויזואלית) או למטה?
-        // בגרסה האחרונה שעבדה ויזואלית השתמשנו בלוגיקה של הכיוון עצמו:
-        // UP = Y קטן.
+    case Direction::UP:
         middle.setPos(x, y - 1);
         end.setPos(x, y - 2);
         break;
@@ -92,87 +111,77 @@ void Spring::setDirection(Direction newDir)
     }
 }
 
-/* ----------------------------------------------------
-                SPRING COLLISION LOGIC
-   ---------------------------------------------------- */
+// =========================================================
+//                 COLLISION LOGIC
+// =========================================================
 
 bool Spring::handleCollision(Player& p, const Screen& screen)
 {
     int px = p.getX();
     int py = p.getY();
 
-    bool onStart = (px == start.getX() && py == start.getY());   // המיקום של ה-W
-    bool onMiddle = (px == middle.getX() && py == middle.getY()); // המיקום של ה-w האמצעי
-    bool onEnd = (px == end.getX() && py == end.getY());         // המיקום של ה-w בקצה
+    bool onStart = (px == start.getX() && py == start.getY());
+    bool onMiddle = (px == middle.getX() && py == middle.getY());
+    bool onEnd = (px == end.getX() && py == end.getY());
 
     if (!onStart && !onMiddle && !onEnd)
         return true;
 
-    // =========================================================
-    //                מצב תעופה (Flying - יציאה)
-    // =========================================================
-    // כשהשחקן משוגר, הוא עף מה-Start לכיוון ה-End.
-    // אנחנו ננצל את המעבר הזה כדי "לאפס" את המקפצה מאחוריו.
+    // --- מצב יציאה (Flying) ---
     if (p.isFlying())
     {
         if (onStart) {
-            start.setChar('w'); // נראה מכווץ כשאנחנו עליו
+            start.setChar('w');
         }
         else if (onMiddle) {
             middle.setChar('w');
-            start.setChar('W');  // עזבנו את ה-Start, אז הוא חוזר להיות W גדול
+            start.setChar('W');
         }
         else if (onEnd) {
             end.setChar('w');
-            middle.setChar('w'); // עזבנו את האמצע, הוא חוזר להיות w קטן
-            start.setChar('W');  // ליתר ביטחון
+            middle.setChar('w');
+            start.setChar('W');
         }
         return true;
     }
 
-    // =========================================================
-    //                מצב הליכה (Walking - כניסה)
-    // =========================================================
+    // --- מצב כניסה (Walking) ---
 
-    // 1. בדיקת כיוון: חובה לבוא *נגד* הכיוון של הקפיץ כדי לדרוך אותו.
-    // אם הקפיץ יורה ימינה, צריך ללכת שמאלה כדי להיכנס אליו.
-    Direction neededDir = Spring::oppositeDirection(direction);
-
-    if (p.getDirection() != neededDir)
+    // 1. שימוש במשתנה השמור (Optimization)
+    // אם כיוון השחקן שונה מהכיוון ההפוך של הקפיץ -> חסימה
+    if (p.getDirection() != this->oppositeDir)
     {
-        return false; // חסימה! (מתנהג כמו קיר אם באים מהצד או מהכיוון הלא נכון)
+        return false;
     }
 
-    // 2. כניסה לקפיץ (מהקצה לבסיס)
-
+    // 2. כניסה לקפיץ 
     if (onEnd) {
-        end.setChar('_'); // אנימציית כיווץ של הקצה
-        return true;      // מאפשרים לעבור
+        end.setChar('_');
+        return true;
     }
 
     if (onMiddle) {
-        middle.setChar('_'); // אנימציית כיווץ של האמצע
-        return true;         // מאפשרים לעבור
+        middle.setChar('_');
+        return true;
     }
 
-    // 3. הגעה לבסיס (Start / W) - כאן העצירה!
+    // 3. הגעה לבסיס - טעינה
     if (onStart)
     {
-        // כיווץ ויזואלי של כל הקפיץ
         start.setChar('_');
         middle.setChar('_');
         end.setChar('_');
 
-        // עצירה וטעינה
         loadSpring(p);
         return true;
     }
 
     return true;
 }
-/* ----------------------------------------------------
-                LOAD PLAYER FOR LAUNCH
-   ---------------------------------------------------- */
+
+// =========================================================
+//                    LOADING LOGIC
+// =========================================================
 
 void Spring::loadSpring(Player& p)
 {
