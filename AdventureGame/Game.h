@@ -14,8 +14,10 @@
 #include "Spring.h"
 #include "Torch.h"
 #include "Riddle.h"
+#include "Obstacle.h"
 #include "LevelLoader.h"
 #include "Logger.h"
+
 
 /*
     Game:

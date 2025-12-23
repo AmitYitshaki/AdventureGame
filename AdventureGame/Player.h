@@ -23,6 +23,7 @@ private:
     int hudX;
     int hudY = 0;
     int speed = 1;
+	int force = 1;
     int live = 3;
     bool flying = false;
     bool loaded = false;
@@ -95,12 +96,13 @@ public:
     void setCurrentLevel(ScreenId id) { currentLevel = id; }
 
     // --- movement / physics ---
-    void move(Screen& screen, std::vector<GameObject*>& gameObjects);
-    void moveFlying(Screen& screen, std::vector<GameObject*>& gameObjects);
+    void move(Screen& screen, std::vector<GameObject*>& gameObjects, const Player* otherPlayer = nullptr);
+    void moveFlying(Screen& screen, std::vector<GameObject*>& gameObjects, const Player* otherPlayer = nullptr);
     void launch(int springLen); // start spring effect based on spring length
     int getSpeed() { return speed; }
     bool isFlying() const { return flying; }
     void setFlying(bool canFly) { flying = canFly; }
+	int getForce() const { return force; }
 
     bool isLoaded() const { return loaded; }
     void setLoaded(bool isLoaded) { loaded = isLoaded; }

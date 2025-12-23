@@ -5,12 +5,15 @@
 #include "Key.h"
 #include "Torch.h"
 #include "spring.h"
+#include "Obstacle.h"
 #include "Direction.h"
 // #include "Riddle.h"
 
 #include <fstream>
 #include <iostream>
 #include <sstream>
+#include <queue>
+#include <utility>
 
 // =========================================================
 //            מימוש פונקציות העזר (Private)
@@ -252,7 +255,7 @@ void LevelLoader::loadLevelFromFile(const std::string& fileName, Screen& screen,
         std::cerr << "Error loading level: " << fileName << std::endl;
         return;
     }
-
+    std::vector<std::string> rawLines;
     std::string line;
     int row = 0;
     ScreenId currentScreenId = screen.getScreenId();
@@ -263,43 +266,126 @@ void LevelLoader::loadLevelFromFile(const std::string& fileName, Screen& screen,
 
     while (std::getline(file, line))
     {
-        if (row < Screen::HEIGHT)
-        {
-            screen.setLine(row, line);
-            for (size_t col = 0; col < line.size(); ++col)
-            {
-                char c = line[col];
+        if (line.size() < Screen::WIDTH) {
+            line.resize(Screen::WIDTH, ' ');
+        }
+        rawLines.push_back(line);
+    }
+    file.close();
 
-                if (c != ' ' && c != '#') {
-                    if (c == '$') { screen.setStartPos1((int)col, row); screen.setChar((int)col, row, ' ');}
-                    else if (c == '&') { screen.setStartPos2((int)col, row); screen.setChar((int)col, row, ' ');}
-                    else { createObject(c, (int)col, row, currentScreenId, gameObjects); screen.setChar((int)col, row, ' ');}
-                }
+    screen.setDark(false);
+
+    std::vector<std::string> mapLayout;
+    std::vector<std::string> metadata;
+    for (size_t i = 0; i < rawLines.size(); ++i)
+    {
+        if (i < Screen::HEIGHT)
+            mapLayout.push_back(rawLines[i]);
+        else
+            metadata.push_back(rawLines[i]);
+    }
+
+    while (mapLayout.size() < Screen::HEIGHT)
+    {
+        mapLayout.push_back(std::string(Screen::WIDTH, ' '));
+    }
+
+    // Pass 1: process players and non-obstacle objects, clear their tiles in the layout.
+    for (size_t row = 0; row < mapLayout.size(); ++row)
+    {
+        for (size_t col = 0; col < mapLayout[row].size(); ++col)
+
+        {
+            char c = mapLayout[row][col];
+            if (c == '$') {
+                screen.setStartPos1((int)col, (int)row);
+                mapLayout[row][col] = ' ';
+            }
+            else if (c == '&') {
+                screen.setStartPos2((int)col, (int)row);
+                mapLayout[row][col] = ' ';
+            }
+            else if (c == '*' || c == '#' || c == ' ') {
+                continue; // handled later or static geometry
+            }
+            else {
+                createObject(c, (int)col, (int)row, currentScreenId, gameObjects);
+                mapLayout[row][col] = ' ';
             }
         }
-        else // Metadata Area
+    }
+
+    // Pass 2: group connected '*' tiles into single obstacles (4-neighbor flood fill).
+    std::vector<std::vector<bool>> visited(Screen::HEIGHT, std::vector<bool>(Screen::WIDTH, false));
+    auto inBounds = [](int x, int y) {
+        return x >= 0 && x < Screen::WIDTH && y >= 0 && y < Screen::HEIGHT;
+        };
+
+    for (int y = 0; y < Screen::HEIGHT && y < (int)mapLayout.size(); ++y)
+    {
+        for (int x = 0; x < Screen::WIDTH && x < (int)mapLayout[y].size(); ++x)
         {
-            if (line.find("CONNECT") == 0)
+            if (mapLayout[y][x] != '*' || visited[y][x])
+                continue;
+
+            std::queue<std::pair<int, int>> q;
+            std::vector<Point> cluster;
+
+            q.push({ x, y });
+            visited[y][x] = true;
+
+            while (!q.empty())
             {
-                parseConnectCommand(line, gameObjects);
+                auto cell = q.front();
+                int cx = cell.first;
+                int cy = cell.second;
+                q.pop();
+
+                cluster.emplace_back(cx, cy, '*');
+                mapLayout[cy][cx] = ' ';
+
+                const int dirs[4][2] = { {1,0},{-1,0},{0,1},{0,-1} };
+                for (auto& d : dirs)
+                {
+                    int nx = cx + d[0];
+                    int ny = cy + d[1];
+
+                    if (inBounds(nx, ny) && !visited[ny][nx] && mapLayout[ny][nx] == '*')
+                    {
+                        visited[ny][nx] = true;
+                        q.push(std::pair<int, int>(nx, ny));
+                    }
+                }
             }
-            else if (line.find("DOOR_DATA") == 0) { // זיהוי הפקודה החדשה
-                parseDoorData(line, gameObjects);
+            if (!cluster.empty())
+            {
+                gameObjects.push_back(new Obstacle(cluster, currentScreenId));
             }
-            else if (line.find("KEY_DATA") == 0) {
-                parseKeyData(line, gameObjects);
+        }
+        screen.setLayout(mapLayout);
+
+        // Pass 3: metadata (connections, darkness, etc.)
+        for (const auto& meta : metadata)
+        {
+            if (meta.find("CONNECT") == 0)
+            {
+                parseConnectCommand(meta, gameObjects);
             }
-            else if (line.find("DARK") != std::string::npos)
+            else if (meta.find("DOOR_DATA") == 0) {
+                parseDoorData(meta, gameObjects);
+            }
+            else if (meta.find("KEY_DATA") == 0) {
+                parseKeyData(meta, gameObjects);
+            }
+            else if (meta.find("DARK") != std::string::npos)
             {
                 screen.setDark(true);
             }
-            else if (line.find("SPRING_DATA") == 0) {
-                parseSpringData(line, gameObjects);
+            else if (meta.find("SPRING_DATA") == 0) {
+                parseSpringData(meta, gameObjects);
             }
         }
-        row++;
     }
-    file.close();
 }
 
 // פונקציה לטעינת מסך "טיפש" (רק גרפיקה, בלי לוגיקה)

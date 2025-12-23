@@ -129,6 +129,8 @@ void Game::drawObjectsToBuffer(std::vector<std::string>& buffer)
 
         if (auto spring = dynamic_cast<Spring*>(obj))
             spring->drawToBuffer(buffer);
+        else if (auto obstacle = dynamic_cast<Obstacle*>(obj))
+            obstacle->drawToBuffer(buffer);
         else
             writeToBuffer(buffer, obj->getX(), obj->getY(), obj->getChar());
     }
@@ -255,14 +257,14 @@ void Game::update()
     // Player 1
     for (int i = 0; i < steps1; ++i)
     {
-        player1.move(*currentScreen, gameObjects);
+        player1.move(*currentScreen, gameObjects, &player2);
         if (!player1.isFlying()) break;
     }
 
     // Player 2
     for (int i = 0; i < steps2; ++i)
     {
-        player2.move(*currentScreen, gameObjects);
+         player2.move(*currentScreen, gameObjects, &player1);
         if (!player2.isFlying()) break;
     }
 

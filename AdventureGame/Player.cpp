@@ -6,6 +6,7 @@
 #include "Riddle.h"
 #include "Door.h"
 #include "Game.h"
+#include "Obstacle.h"
 #include <vector>
 
 /*
@@ -32,6 +33,7 @@ void Player::resetForNewGame(int x, int y, char c, int hudPos, ScreenId startLev
     // Basic movement state
     dir = Direction::STAY;
     speed = 1;
+    force = 1;
 
     // Life & level
     live = 3;
@@ -54,7 +56,7 @@ void Player::resetForNewGame(int x, int y, char c, int hudPos, ScreenId startLev
                     NORMAL MOVEMENT
    ---------------------------------------------------- */
 
-void Player::move(Screen& screen, std::vector<GameObject*>& gameObjects)
+void Player::move(Screen& screen, std::vector<GameObject*>& gameObjects, const Player* otherPlayer)
 {
 	if (point.getX() == -1 || point.getY() == -1) //if player is off-screen
     {
@@ -67,7 +69,7 @@ void Player::move(Screen& screen, std::vector<GameObject*>& gameObjects)
     // If flying due to spring effect → redirect movement
     if (isFlying())
     {
-        moveFlying(screen, gameObjects);
+        moveFlying(screen, gameObjects, otherPlayer);
         return;
     }
 
@@ -83,6 +85,18 @@ void Player::move(Screen& screen, std::vector<GameObject*>& gameObjects)
     }
 
     Point next(point.getX() + dx, point.getY() + dy, ' ');
+
+    // Prevent stepping into the other player if they are stationary on the target tile
+    if (otherPlayer)
+    {
+        if (otherPlayer->getX() == next.getX() &&
+            otherPlayer->getY() == next.getY() &&
+            otherPlayer->getDirection() == Direction::STAY)
+        {
+            stopMovement();
+            return;
+        }
+    }
 
     // Wall collision stopping regular movement
     if (screen.isWall(next))
@@ -106,8 +120,15 @@ void Player::move(Screen& screen, std::vector<GameObject*>& gameObjects)
 
         if (obj->isAtPosition(px, py) && !obj->isCollected())
         {
-            bool allowed = obj->handleCollision(*this, screen);
-
+			bool allowed = true;    //initially assume movement is allowed(will change if collision says otherwise)
+            if (auto obstacle = dynamic_cast<Obstacle*>(obj))
+            {
+                allowed = obstacle->handleCollision(*this, screen, otherPlayer, gameObjects);
+            }
+            else
+            {
+                allowed = obj->handleCollision(*this, screen);
+            }
             if (!allowed)
             {
                 // Undo movement
@@ -122,7 +143,7 @@ void Player::move(Screen& screen, std::vector<GameObject*>& gameObjects)
                 SPRING / FLYING MOVEMENT
    ---------------------------------------------------- */
 
-void Player::moveFlying(Screen& screen, std::vector<GameObject*>& gameObjects)
+void Player::moveFlying(Screen& screen, std::vector<GameObject*>& gameObjects, const Player* otherPlayer)
 {
     int dx = 0, dy = 0;
 
@@ -142,6 +163,19 @@ void Player::moveFlying(Screen& screen, std::vector<GameObject*>& gameObjects)
     else if (dir == Direction::DOWN) dy += 1;
 
     Point next(point.getX() + dx, point.getY() + dy, ' ');
+
+    // Prevent flying into a stationary other player
+    if (otherPlayer)
+    {
+        if (otherPlayer->getX() == next.getX() &&
+            otherPlayer->getY() == next.getY() &&
+            otherPlayer->getDirection() == Direction::STAY)
+        {
+            stopSpringEffect();
+            return;
+        }
+    }
+
 
     // Wall collision stops spring effect
     if (screen.isWall(next))
@@ -165,7 +199,16 @@ void Player::moveFlying(Screen& screen, std::vector<GameObject*>& gameObjects)
 
         if (obj->isAtPosition(px, py) && !obj->isCollected())
         {
-            bool allowed = obj->handleCollision(*this, screen);
+            bool allowed = true;
+
+            if (auto obstacle = dynamic_cast<Obstacle*>(obj))
+            {
+                allowed = obstacle->handleCollision(*this, screen, otherPlayer, gameObjects);
+            }
+            else
+            {
+                allowed = obj->handleCollision(*this, screen);
+            }
 
             if (!allowed)
             {
@@ -195,6 +238,7 @@ void Player::startSpringEffect(int springLen)
 
     flying = true;
     loaded = false;
+    force = springLen;
     dir = launchDirection; // lock initial launch direction
 }
 
@@ -215,6 +259,7 @@ void Player::stopSpringEffect()
     flying = false;
     springTicksLeft = 0;
     speed = 1;
+	force = 1;
 
     launchDirection = Direction::STAY;
     dir = Direction::STAY;
