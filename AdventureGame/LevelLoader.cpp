@@ -4,6 +4,7 @@
 #include "Door.h"
 #include "Key.h"
 #include "Torch.h"
+#include "Riddle.h"
 #include "spring.h"
 #include "Obstacle.h" 
 #include "Direction.h"
@@ -96,6 +97,8 @@ void LevelLoader::createObject(char c, int x, int y, ScreenId screenId, std::vec
         gameObjects.push_back(new Door(x, y, c, screenId, -1, ScreenId::ROOM1, false)); break;
     case 'K': gameObjects.push_back(new Key(x, y, 'K', screenId, -1)); break;
     case '!': gameObjects.push_back(new Torch(x, y, '!', screenId)); break;
+    case '?':gameObjects.push_back(new Riddle(x, y, screenId));
+        break;
     case 'W':
         // יוצרים עם אורך ברירת מחדל 3
         gameObjects.push_back(new Spring(Point(x, y, 'W'), Point(x, y, 'w'), Point(x, y, 'w'), Direction::STAY, screenId, 3));

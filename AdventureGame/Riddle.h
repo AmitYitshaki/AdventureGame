@@ -1,47 +1,40 @@
-#pragma once
-
+﻿#pragma once
 #include "GameObject.h"
+#include <vector>
+#include <string>
 
-class Player;
-class Screen;
-
-/*
-    Riddle:
-    Collectible puzzle item that opens a full-screen UI
-    when picked. Removed from world upon pickup.
-*/
-enum class RiddleId
-{
-    RIDDLE1,
-    RIDDLE2,
-    RIDDLE3
+// מבנה נתונים פשוט שמחזיק את תוכן החידה
+struct RiddleData {
+    int id = -1;
+	int correctAnswer = 1; // ברירת מחדל: תשובה 1
+    std::vector<std::string> textLines;
 };
 
 class Riddle : public GameObject
 {
-public:
-    static constexpr int WIDTH = 75;
-    static constexpr int HEIGHT = 20;
-
 private:
-    RiddleId id;
-    const char* const* layout = nullptr;
-    int correctAnswer = 1;
+    RiddleData data; // הנתונים שהוזרקו לחידה
     bool solved = false;
 
-    // Static layouts
-    static const char* RIDDLE1[HEIGHT];
-    static const char* RIDDLE2[HEIGHT];
-    static const char* RIDDLE3[HEIGHT];
-
 public:
-    Riddle();
-    Riddle(int x, int y, ScreenId screen, RiddleId id);
+    // גודל ה-Overlay (כמעט כל המסך)
+    static constexpr int WIDTH = 76;
+    static constexpr int HEIGHT = 22;
 
-    RiddleId getId() const { return id; }
-    int getCorrectAnswer() const { return correctAnswer; }
+    Riddle(int x, int y, ScreenId screen)
+        : GameObject(x, y, '?', screen) {
+    }
 
-    const char* getLine(int row) const;
+    // פונקציה להזרקת הנתונים (נקראת ע"י Game)
+    void setData(const RiddleData& newData) { data = newData; }
+
+    int getCorrectAnswer() const { return data.correctAnswer; }
+
+    // שליפת שורה לציור
+    const char* getLine(int row) const {
+        if (row < 0 || row >= (int)data.textLines.size()) return "";
+        return data.textLines[row].c_str();
+    }
 
     bool isSolved() const { return solved; }
     void markSolved() { solved = true; }

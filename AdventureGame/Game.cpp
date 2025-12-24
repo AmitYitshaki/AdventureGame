@@ -44,6 +44,7 @@ void Game::initGame()
     LevelLoader::loadScreenFromFile("InstructionsScreen.txt", screens[(int)ScreenId::INSTRUCTIONS]);
 
     currentScreen = &screens[(int)ScreenId::HOME];
+    loadRiddlesFromFile("Riddles.txt");
 }
 
 void Game::resetGame()
@@ -79,6 +80,7 @@ void Game::resetGame()
     // 5. התחלת המשחק בפועל!
     // מכיוון שלחצנו "Start New Game", אנחנו רוצים לעבור ישר לחדר 1
     goToScreen(ScreenId::ROOM1);
+    loadRiddlesFromFile("Riddles.txt");
 }
 
 /* ============================================================
@@ -240,30 +242,74 @@ void Game::drawLegendToBuffer(std::vector<std::string>& buffer)
 
 void Game::drawRiddle(std::vector<std::string>& buffer)
 {
-    if (!currentRiddle)
-        return;
+    if (!currentRiddle) return;
 
-    const int w = Riddle::WIDTH;
-    const int h = Riddle::HEIGHT;
+    // 1. חישוב הגודל האמיתי של החידה הנוכחית
+    // אנחנו עוברים על כל השורות כדי למצוא את השורה הכי ארוכה ואת מספר השורות
+    int contentHeight = 0;
+    int contentWidth = 0;
 
-    int startX = (Screen::WIDTH - w) / 2;
-    int startY = (Screen::HEIGHT - h) / 2;
-
-    for (int y = 0; y < h; ++y)
+    // נניח שיש מקסימום 20 שורות (הגבול ששמנו ב-h), נסרוק עד שנקבל שורה ריקה
+    // או שפשוט נשתמש בידיעה שיש לנו וקטור בתוך RiddleData
+    // אבל מכיוון שאין לנו גישה ישירה לווקטור מבחוץ, נשתמש ב-getLine בלולאה
+    for (int i = 0; i < Riddle::HEIGHT; ++i)
     {
-        const char* line = currentRiddle->getLine(y);
-        if (!line) continue;
+        const char* line = currentRiddle->getLine(i);
+        if (line == nullptr || line[0] == '\0') {
+            // אם הגענו לשורה ריקה והיא לא חלק מהעיצוב (בסוף), אפשר לעצור?
+            // למען הפשטות, נניח שהחידה מסתיימת כשנגמר המידע בנתונים
+            // הדרך הכי טובה היא להוסיף פונקציה getLineCount ל-Riddle, אבל נסתדר בלי:
+        }
 
-        for (int x = 0; x < w && line[x] != '\0'; ++x)
+        // בדיקת אורך
+        int len = (line) ? (int)strlen(line) : 0;
+        if (len > 0) {
+            contentHeight = i + 1; // הגובה הוא האינדקס האחרון שיש בו תוכן + 1
+            if (len > contentWidth) contentWidth = len;
+        }
+    }
+
+    // אם החידה ריקה משום מה, לא מציירים
+    if (contentHeight == 0) return;
+
+    // 2. חישוב מיקום מרכזי
+    int startX = (Screen::WIDTH - contentWidth) / 2;
+    int startY = (Screen::HEIGHT - contentHeight) / 2;
+
+    // 3. ציור החידה (1 ל-1 כמו בקובץ)
+    for (int y = 0; y < contentHeight; ++y)
+    {
+        const char* lineStr = currentRiddle->getLine(y);
+        int len = (lineStr) ? (int)strlen(lineStr) : 0;
+
+        for (int x = 0; x < contentWidth; ++x)
         {
-            int bx = startX + x;
-            int by = startY + y;
+            char c = ' '; // ברירת מחדל: רווח
 
-            if (bx >= 0 && bx < Screen::WIDTH &&
-                by >= 0 && by < Screen::HEIGHT)
-            {
-                buffer[by][bx] = line[x];
+            // אם אנחנו בתוך הטקסט של השורה
+            if (x < len) {
+                c = lineStr[x];
             }
+
+            // כתיבה לבאפר (דורס את מה שמתחת - יוצר רקע אטום)
+            writeToBuffer(buffer, startX + x, startY + y, c);
+        }
+    }
+
+    // 4. ציור הודעת סטטוס (מתחת לחידה)
+    // ככה זה לא עולה על הטקסט המקורי של החידה
+    if (!statusMessage.empty())
+    {
+        std::string msg = statusMessage;
+        int msgLen = (int)msg.length();
+
+        // נמקם את ההודעה שורה אחת מתחת לחידה, במרכז
+        int msgX = (Screen::WIDTH - msgLen) / 2;
+        int msgY = startY + contentHeight + 1;
+
+        // נוודא שלא חורגים מגובה המסך
+        if (msgY < Screen::HEIGHT) {
+            writeHudText(buffer, msgX, msgY, msg);
         }
     }
 }
@@ -629,11 +675,83 @@ void Game::goToScreen(ScreenId id)
 
     setStatusMessage("");
     if (currentScreen->isDark()) setStatusMessage("Dark room... Try a Torch!");
+    assignRiddlesToLevel();
 }
 
 /* ============================================================
                          RIDDLE SYSTEM
    ============================================================ */
+
+void Game::loadRiddlesFromFile(const std::string& filename)
+{
+    std::ifstream file(filename);
+    if (!file) return;
+
+    riddlesPool.clear();
+    std::string line;
+    RiddleData current;
+    bool readingText = false;
+    bool shouldShuffle = true; // ברירת מחדל
+
+    while (std::getline(file, line)) {
+        if (!line.empty() && line.back() == '\r') line.pop_back();
+
+        // בדיקת הגדרות
+        if (line.find("SHUFFLE:") != std::string::npos) {
+            if (line.find("FALSE") != std::string::npos) shouldShuffle = false;
+            continue;
+        }
+
+        if (line == "[RIDDLE]") {
+            current = RiddleData();
+            readingText = false;
+        }
+        else if (line.find("ID:") == 0) current.id = std::stoi(line.substr(3));
+        else if (line.find("ANSWER:") == 0) current.correctAnswer = std::stoi(line.substr(7));
+        else if (line == "TEXT") readingText = true;
+        else if (line == "END_TEXT") {
+            readingText = false;
+            riddlesPool.push_back(current);
+        }
+        else if (readingText) current.textLines.push_back(line);
+    }
+    file.close();
+
+    // לוגיקת סדר
+    if (shouldShuffle) {
+        unsigned seed = std::chrono::system_clock::now().time_since_epoch().count();
+        std::shuffle(riddlesPool.begin(), riddlesPool.end(), std::default_random_engine(seed));
+    }
+    else {
+        // מיון עולה לפי ID
+        std::sort(riddlesPool.begin(), riddlesPool.end(),
+            [](const RiddleData& a, const RiddleData& b) { return a.id < b.id; });
+        // הופכים כדי שהראשון יהיה בסוף הווקטור (לשליפה קלה)
+        std::reverse(riddlesPool.begin(), riddlesPool.end());
+    }
+}
+
+void Game::assignRiddlesToLevel()
+{
+    for (GameObject* obj : gameObjects)
+    {
+        Riddle* riddle = dynamic_cast<Riddle*>(obj);
+        // אם זו חידה והיא שייכת למסך הנוכחי
+        if (riddle && riddle->getScreenId() == currentScreen->getScreenId())
+        {
+            if (riddlesPool.empty()) {
+                // אופציונלי: טעינה מחדש אם נגמר
+                loadRiddlesFromFile("Riddles.txt");
+            }
+
+            if (!riddlesPool.empty()) {
+                RiddleData data = riddlesPool.back(); // שליפה מהסוף
+                riddlesPool.pop_back();               // מחיקה
+                riddle->setData(data);                // הזרקה לאובייקט
+            }
+        }
+    }
+}
 
 bool Game::checkPlayerHasRiddle()
 {
