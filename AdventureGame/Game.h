@@ -78,10 +78,11 @@ private:
     std::vector<std::string> initBuffer();
     void writeToBuffer(std::vector<std::string>& buffer, int x, int y, char c);
     void writeTextToBuffer(std::vector<std::string>& buffer, int x, int y, const std::string& text);
-
+    void writeHudText(std::vector<std::string>& buffer, int x, int y, const std::string& text);
+    void drawLegendToBuffer(std::vector<std::string>& buffer);
     void drawObjectsToBuffer(std::vector<std::string>& buffer);
     void drawPlayersToBuffer(std::vector<std::string>& buffer);
-    void drawStatusToBuffer(std::vector<std::string>& buffer);
+    void drawStatusMessageAt(std::vector<std::string>& buffer, int x, int y, int maxWidth);
     void drawRiddle(std::vector<std::string>& buffer);
     void renderBuffer(const std::vector<std::string>& buffer);
     void drawDebugDashboard();

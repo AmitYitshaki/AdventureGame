@@ -35,7 +35,8 @@ void Player::resetForNewGame(int x, int y, char c, int hudPos, ScreenId startLev
     speed = 1;
     force = 1;
 
-    // Life & level
+    // Life & score & level
+	score = 0;
     live = 3;
     currentLevel = startLevel;
 
@@ -278,7 +279,7 @@ bool Player::collectItem(GameObject* item)
         item->Collected();
 
         // Attach to HUD position
-        item->setPosition(hudX, hudY);
+        item->setPosition(hudX+13, hudY);
 
         Game::setStatusMessage(std::string("Collected item '") + item->getChar() + "'");
         return true;
@@ -358,3 +359,29 @@ void Player::decreaseLife()
     if (live > 0)
         live--;
 }
+
+void Player::initForLevel(int x, int y, char c, ScreenId levelID)
+{
+    // 1. מיקום פיזי (Physical Position)
+    point.setPos(x, y);
+    point.setChar(c);
+    dir = Direction::STAY;
+    speed = 1;
+    force = 1;
+    flying = false;
+    loaded = false;
+    springTicksLeft = 0;
+    lastLoadedSpringLength = 0;
+    launchDirection = Direction::STAY;
+}
+
+void Player::resetStats()
+{
+    score = 0;
+    live = 3;
+    heldItem = nullptr; // במשחק חדש מתחילים בלי כלום
+}
+
+
+
+

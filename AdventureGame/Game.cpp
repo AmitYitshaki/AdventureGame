@@ -58,10 +58,8 @@ void Game::resetGame()
     gameObjects.clear();
 
     // 3. איפוס נתוני שחקנים (חיים, ניקוד וכו') - אם יש לך פונקציה כזו ב-Player
-    player1.resetLives(); // הנחה: הוספת פונקציה כזו
-    player2.resetLives();
-	player1.removeHeldItem();
-	player2.removeHeldItem();
+    player1.resetStats();
+    player2.resetStats();
 
     // 4. טעינת שלבי המשחק "טריים" מהקבצים
     // אנחנו דורסים את מה שהיה בזיכרון בטעינה חדשה
@@ -124,6 +122,15 @@ void Game::writeTextToBuffer(std::vector<std::string>& buffer, int x, int y, con
     }
 }
 
+void Game::writeHudText(std::vector<std::string>& buffer, int x, int y, const std::string& text)
+{
+    for (size_t i = 0; i < text.size(); ++i)
+    {
+        writeToBuffer(buffer, x + (int)i, y, text[i]);
+    }
+}
+
+
 void Game::drawObjectsToBuffer(std::vector<std::string>& buffer)
 {
     ScreenId currentId = currentScreen->getScreenId();
@@ -150,29 +157,85 @@ void Game::drawPlayersToBuffer(std::vector<std::string>& buffer)
 
     writeToBuffer(buffer, player1.getX(), player1.getY(), player1.getChar());
     writeToBuffer(buffer, player2.getX(), player2.getY(), player2.getChar());
-
-    // --- עיצוב חדש וקומפקטי ל-HUD ---
-    // P1: HP:3 Key
-    std::string p1Text = "P1: HP:" + std::to_string(player1.getLive());
-    if (player1.hasItem()) {
-        p1Text += " Itm:";
-        p1Text += player1.getItemChar();
-    }
-
-    std::string p2Text = "P2: HP:" + std::to_string(player2.getLive());
-    if (player2.hasItem()) {
-        p2Text += " Itm:";
-        p2Text += player2.getItemChar();
-    }
-
-    writeTextToBuffer(buffer, player1.getHudX(), player1.getHudY(), p1Text);
-    writeTextToBuffer(buffer, player2.getHudX(), player2.getHudY(), p2Text);
 }
 
-void Game::drawStatusToBuffer(std::vector<std::string>& buffer)
+void Game::drawStatusMessageAt(std::vector<std::string>& buffer, int x, int y, int maxWidth)
 {
-    if (!statusMessage.empty())
-        writeTextToBuffer(buffer, 20, 0, statusMessage); // מיקום מרכזי יותר
+    if (statusMessage.empty() || maxWidth <= 0) return;
+
+    std::string msg = statusMessage;
+
+    // 1. חיתוך אם ארוך מדי
+    if ((int)msg.length() > maxWidth) {
+        msg = msg.substr(0, maxWidth);
+    }
+    
+    // 2. ריפוד ברווחים (כדי למחוק הודעות קודמות ארוכות יותר)
+    // ניצור מחרוזת באורך המקסימלי המותר, מלאה ברווחים, ונלביש עליה את ההודעה
+    std::string finalMsg = msg + std::string(maxWidth - msg.length(), ' ');
+
+    writeHudText(buffer, x, y, finalMsg);
+}
+
+void Game::drawLegendToBuffer(std::vector<std::string>& buffer)
+{
+    if (currentScreen->getScreenId() == ScreenId::HOME ||
+        currentScreen->getScreenId() == ScreenId::INSTRUCTIONS) return;
+
+    // --- חישובים ---
+    int startX = player1.getHudX() - 1;
+    int y = player1.getHudY();
+    const int LEGEND_WIDTH = 75;
+    std::cout << "DEBUG: Drawing Legend at Y=" << y << std::endl;
+    // הגנה מקריסה
+    if (y - 1 < 0 || y + 1 >= Screen::HEIGHT)
+    {
+        std::cout << "DEBUG: Legend Y is out of bounds! Y=" << y << std::endl;
+        return;
+    }
+    int actualWidth = (startX + LEGEND_WIDTH > Screen::WIDTH) ? Screen::WIDTH - startX : LEGEND_WIDTH;
+
+    // ------------------------------------
+    // 1. ציור המסגרת (Border)
+    // ------------------------------------
+    std::string border(actualWidth, '#');
+    std::string clean(actualWidth - 2, ' ');
+
+    writeHudText(buffer, startX, y - 1, border);     // למעלה
+    writeHudText(buffer, startX, y + 1, border);     // למטה
+    writeToBuffer(buffer, startX, y, '#');           // צד שמאל
+    writeHudText(buffer, startX + 1, y, clean);      // ניקוי אמצע
+    writeToBuffer(buffer, startX + actualWidth - 1, y, '#'); // צד ימין
+
+
+    // ------------------------------------
+    // 2. נתוני שחקנים (Player Stats)
+    // ------------------------------------
+    // שחקן 1
+    writeHudText(buffer, player1.getHudX(), y,
+        "p1 Hp:"+ std::to_string(player1.getLive()) + " item:");
+    char p1Icon = player1.hasItem() ? player1.getItemChar() : '_';
+    writeToBuffer(buffer, player1.getHudX() + 13, y, p1Icon);
+
+    // שחקן 2
+    writeHudText(buffer, player2.getHudX(), y,
+        "p2 Hp:" + std::to_string(player2.getLive()) + " item:");
+    char p2Icon = player2.hasItem() ? player2.getItemChar() : '_';
+    writeToBuffer(buffer, player2.getHudX() + 13, y, p2Icon);
+
+    // ניקוד
+    int scoreX = player2.getHudX() + 16;
+    writeHudText(buffer, scoreX, y,
+        "score:" + std::to_string(player1.getScore() + player2.getScore()));
+
+    // ------------------------------------
+    // 3. הודעות (Status Message)
+    // ------------------------------------
+    // שימוש בפונקציית העזר האלגנטית שיצרנו!
+    int msgX = scoreX + 11;
+    int maxMsgLen = (startX + actualWidth - 1) - msgX;
+
+    drawStatusMessageAt(buffer, msgX, y, maxMsgLen);
 }
 
 void Game::drawRiddle(std::vector<std::string>& buffer)
@@ -250,10 +313,10 @@ void Game::drawDebugDashboard()
 void Game::draw()
 {
     auto buffer = initBuffer();
-
+	
     drawObjectsToBuffer(buffer);
     drawPlayersToBuffer(buffer);
-    drawStatusToBuffer(buffer);
+    drawLegendToBuffer(buffer);
     applyLighting(buffer);
 
     if (RiddleMode && currentRiddle)
@@ -515,40 +578,57 @@ void Game::checkLevelTransition()
 
 void Game::goToScreen(ScreenId id)
 {
-    // 1. עדכון המסך הנוכחי
     currentScreen = &screens[(int)id];
+
+    // --- חישוב ה-Legend ---
+    int legendBaseX = 0;
+    int legendBaseY = 0;
 
     if (currentScreen->hasLegendDefined())
     {
-        Point legendPos = currentScreen->getLegendStart();
+        Point lPos = currentScreen->getLegendStart();
+        legendBaseX = lPos.getX();
+        legendBaseY = lPos.getY();
 
-        player1.setHudPosition(legendPos.getX(), legendPos.getY());
+        // =========================================================
+        // === התוספת: חסימת אזור ה-Legend בקירות ===
+        // =========================================================
+        const int LEGEND_WIDTH = 75; // רוחב ה-Legend הקבוע
 
-        player2.setHudPosition(legendPos.getX() + 20, legendPos.getY());
+        // אנחנו חוסמים 3 שורות: השורה של ה-L (גג), שורת הטקסט, ושורת הרצפה
+        // הלולאה רצה מ-legendBaseY (איפה שה-L) ועד שתי שורות מתחתיו
+        for (int y = legendBaseY; y <= legendBaseY + 2; ++y)
+        {
+            for (int x = legendBaseX; x < legendBaseX + LEGEND_WIDTH; ++x)
+            {
+                // הגנה מחריגה (שלא נכתוב מחוץ לגבולות המערך)
+                if (y >= 0 && y < Screen::HEIGHT && x >= 0 && x < Screen::WIDTH)
+                {
+                    // צורבים '#' לתוך זיכרון המפה.
+                    // עכשיו הפונקציה isWall תחזיר true והשחקן ייעצר אוטומטית!
+                    currentScreen->setChar(x, y, '#');
+                }
+            }
+        }
+        // =========================================================
     }
-    else
-    {
-        // ברירת מחדל למסכים ללא L (כמו תפריט ראשי)
-        player1.setHudPosition(0, 0);
-        player2.setHudPosition(0, 1);
-    }
 
-    // 2. שליפת נקודות ההתחלה שה-LevelLoader שמר בתוך המסך
+    // עדכון מיקום ה-HUD לשחקנים (זה נשמר בזיכרון של השחקן)
+    int textRowY = legendBaseY + 1;
+    player1.setHudPosition(legendBaseX + 1, textRowY);
+    player2.setHudPosition(legendBaseX + 17, textRowY); // שמרתי על ה-17 שלך
+
+
+    // --- אתחול השחקנים לחדר החדש ---
     Point start1 = currentScreen->getStartPos1();
     Point start2 = currentScreen->getStartPos2();
 
-    // 3. איפוס השחקנים למיקום החדש (כולל ה-HUD שלהם)
-    // שים לב: אנחנו שולחים את id בתור המסך הנוכחי שלהם
-    player1.resetForNewGame(start1.getX(), start1.getY(), '$', player1.getHudX(), id);
-    player2.resetForNewGame(start2.getX(), start2.getY(), '&', player2.getHudX(), id);
+    // שימוש בפונקציה החדשה שלא דורסת את ה-HUD ולא מאפסת חיים
+    player1.initForLevel(start1.getX(), start1.getY(), '$', id);
+    player2.initForLevel(start2.getX(), start2.getY(), '&', id);
 
-    // 4. ניקוי הודעות
     setStatusMessage("");
-
-    // בונוס: אם המסך חשוך, נעדכן הודעה
-    if (currentScreen->isDark()) {
-        setStatusMessage("It's dark here... you need a Torch!");
-    }
+    if (currentScreen->isDark()) setStatusMessage("Dark room... Try a Torch!");
 }
 
 /* ============================================================

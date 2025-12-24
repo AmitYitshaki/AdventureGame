@@ -286,6 +286,7 @@ void LevelLoader::loadLevelFromFile(const std::string& fileName, Screen& screen,
             }
             else if (c == 'L') {
                 screen.setLegendStart((int)col, (int)row);
+                std::cout << "DEBUG: Found L at " << col << "," << row << std::endl;
                 mapLayout[row][col] = ' ';
             }
             else if (c == '*' || c == '#') {

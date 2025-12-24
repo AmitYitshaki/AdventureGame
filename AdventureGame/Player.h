@@ -24,6 +24,7 @@ private:
     int hudY = 0;
     int speed = 1;
 	int force = 1;
+	int score = 0;
     int live = 3;
     bool flying = false;
     bool loaded = false;
@@ -94,6 +95,8 @@ public:
     // --- level info ---
     ScreenId getCurrentLevel() const { return currentLevel; }
     void setCurrentLevel(ScreenId id) { currentLevel = id; }
+    void initForLevel(int x, int y, char c, ScreenId id);
+    void resetStats();
 
     // --- movement / physics ---
     void move(Screen& screen, std::vector<GameObject*>& gameObjects, const Player* otherPlayer = nullptr);
@@ -138,10 +141,12 @@ public:
     bool hasRiddle() const;
     Riddle* getHeldRiddle() const;
     char getItemChar() const;
-    // --- life system ---
+    // --- life system and score ---
     void decreaseLife();
     int getLive() const { return live; }
 	void resetLives() { live = 3; }
+	int getScore() const { return score; }
+	void increaseScore(int amount) { score += amount; }
 
     // --- spring stored data ---
     int getLoadedSpringLen() const { return lastLoadedSpringLength; }
