@@ -756,7 +756,7 @@ void Game::loadRiddlesFromFile(const std::string& filename)
 
     // לוגיקת סדר
     if (shouldShuffle) {
-        unsigned seed = std::chrono::system_clock::now().time_since_epoch().count();
+        unsigned int seed = (unsigned int)std::chrono::system_clock::now().time_since_epoch().count();
         std::shuffle(riddlesPool.begin(), riddlesPool.end(), std::default_random_engine(seed));
     }
     else {
@@ -906,55 +906,64 @@ void Game::explodeCell(int x, int y, Screen& screen)
     ScreenId curr_screen = screen.getScreenId();
 
     // 1. פגיעה בשחקנים
-    if (player1.getX() == x && player1.getY() == y) {
-        player1.decreaseLife();
-        // אופציונלי: להעיף את השחקן אחורה או רק להוריד חיים
-    }
+    if (player1.getX() == x && player1.getY() == y) player1.decreaseLife();
+    if (player2.getX() == x && player2.getY() == y) player2.decreaseLife();
 
-    if (player2.getX() == x && player2.getY() == y) {
-        player2.decreaseLife();
-    }
-
-    // 2. הרס קירות (עם הגנות)
-    // א. הגנה על מסגרת המסך (הגבול החיצוני)
+    // 2. הרס קירות (עם הגנה על מסגרת ומקרא)
     bool isBorder = (x == 0 || x == Screen::WIDTH - 1 || y == 0 || y == Screen::HEIGHT - 1);
-
-    // ב. הגנה על אזור ה-Legend (אם קיים במסך הזה)
     bool isLegendArea = false;
-    if (screen.hasLegendDefined())
-    {
+
+    if (screen.hasLegendDefined()) {
         Point lPos = screen.getLegendStart();
-        // ה-Legend הוא ברווח 75 וגובה 3 שורות
+        // בדיקת חפיפה עם אזור המקרא (רוחב קבוע 75, גובה 3 שורות)
         if (x >= lPos.getX() && x < lPos.getX() + Screen::LEGEND_WIDTH &&
-            y >= lPos.getY() && y <= lPos.getY() + 2)
-        {
+            y >= lPos.getY() && y <= lPos.getY() + 2) {
             isLegendArea = true;
         }
     }
 
-    // ביצוע ההרס לקיר בלבד אם הוא לא מוגן
-    if (!isBorder && !isLegendArea)
-    {
-        // אנחנו בודקים בזיכרון של המסך אם יש שם קיר
+    if (!isBorder && !isLegendArea) {
         if (screen.getLine(y)[x] == '#') {
             screen.setChar(x, y, ' '); // הופך לאוויר
         }
     }
 
-    // 3. מחיקת אובייקטים אחרים (אויבים/חפצים)
-    for (GameObject* obj : gameObjects)
+    // 3. פגיעה באובייקטים
+    for (size_t i = 0; i < gameObjects.size(); ++i)
     {
+        GameObject* obj = gameObjects[i];
         if (!obj) continue;
+
+        // סינונים רגילים
         if (obj->getScreenId() != curr_screen) continue;
         if (obj->getX() < 0 || obj->getY() < 0) continue; // כבר מחוק
         if (obj->isCollected()) continue; // בתיק
 
+        // האם האובייקט נמצא במוקד הפיצוץ?
         if (obj->isAtPosition(x, y))
         {
-            // לא מוחקים פצצות אחרות כדי למנוע באגים של שרשרת כרגע
+            // לא מפוצצים פצצות אחרות (כדי למנוע שרשרת כרגע)
             if (dynamic_cast<Bomb*>(obj)) continue;
 
-            obj->removeFromGame();
+            // === טיפול במכשולים (Obstacles) ===
+            if (auto obstacle = dynamic_cast<Obstacle*>(obj))
+            {
+                if (obstacle->eraseBlockAt(x, y)) {
+                    obj->removeFromGame(); // אם התרוקן לגמרי
+                }
+            }
+            // === טיפול בקפיצים (Springs) - התוספת החדשה ===
+            else if (auto spring = dynamic_cast<Spring*>(obj))
+            {
+                if (spring->handleExplosionAt(x, y)) {
+                    obj->removeFromGame(); // אם הראש נהרס או הכל נהרס
+                }
+            }
+            // === אובייקטים רגילים ===
+            else
+            {
+                obj->removeFromGame();
+            }
         }
     }
 }

@@ -1,28 +1,31 @@
 ﻿#include "Spring.h"
 #include "Player.h"
 #include "Screen.h"
-#include "Game.h"
-#include <vector>
-
-/*
-    Spring.cpp
-    Handles spring logic and rendering.
-*/
+#include <iostream> 
 
 // =========================================================
 //                   HELPER FUNCTIONS
 // =========================================================
 
-// Static helper to calculate opposite direction
 Direction Spring::oppositeDirection(Direction d)
 {
-    switch (d)
-    {
+    switch (d) {
     case Direction::UP:    return Direction::DOWN;
     case Direction::DOWN:  return Direction::UP;
     case Direction::LEFT:  return Direction::RIGHT;
     case Direction::RIGHT: return Direction::LEFT;
-    default:               return Direction::STAY; // Should not happen for spring
+    default:               return Direction::STAY;
+    }
+}
+
+void Spring::getDelta(Direction d, int& dx, int& dy)
+{
+    dx = 0; dy = 0;
+    switch (d) {
+    case Direction::UP:    dy = -1; break;
+    case Direction::DOWN:  dy = 1;  break;
+    case Direction::LEFT:  dx = -1; break;
+    case Direction::RIGHT: dx = 1;  break;
     }
 }
 
@@ -30,10 +33,8 @@ static void putPointToBuffer(std::vector<std::string>& buffer, const Point& pt)
 {
     int x = pt.getX();
     int y = pt.getY();
-
-    if (y >= 0 && y < (int)buffer.size() &&
-        x >= 0 && x < (int)buffer[y].size())
-    {
+    // הגנה מפני נקודות מחוקות או חריגה מהמסך
+    if (x >= 0 && y >= 0 && y < (int)buffer.size() && x < (int)buffer[y].size()) {
         buffer[y][x] = pt.getChar();
     }
 }
@@ -42,16 +43,12 @@ static void putPointToBuffer(std::vector<std::string>& buffer, const Point& pt)
 //                   CONSTRUCTOR
 // =========================================================
 
-Spring::Spring(const Point& startPt, const Point& middlePt, const Point& endPt, Direction dir, ScreenId screenId,int springLength)
-    : GameObject(endPt.getX(), endPt.getY(), 'W', screenId, false, false),
-    start(startPt),
-    middle(middlePt),
-    end(endPt),
-    direction(dir),
-    springLength(springLength)
+Spring::Spring(const Point& basePosition, Direction dir, ScreenId screenId, int length)
+    : GameObject(basePosition.getX(), basePosition.getY(), 'W', screenId, false, false),
+    direction(dir)
 {
-    // חישוב ושמירה של הכיוון ההפוך כבר ביצירה
-    this->oppositeDir = oppositeDirection(dir);
+    // הבנאי משתמש ב-rebuild כדי ליצור את החלקים בפעם הראשונה
+    rebuild(dir, length);
 }
 
 // =========================================================
@@ -60,9 +57,9 @@ Spring::Spring(const Point& startPt, const Point& middlePt, const Point& endPt, 
 
 void Spring::drawToBuffer(std::vector<std::string>& buffer) const
 {
-    putPointToBuffer(buffer, start);
-    putPointToBuffer(buffer, middle);
-    putPointToBuffer(buffer, end);
+    for (const auto& p : parts) {
+        putPointToBuffer(buffer, p);
+    }
 }
 
 // =========================================================
@@ -71,44 +68,52 @@ void Spring::drawToBuffer(std::vector<std::string>& buffer) const
 
 bool Spring::isAtPosition(int x, int y) const
 {
-    return (x == start.getX() && y == start.getY()) ||
-        (x == middle.getX() && y == middle.getY()) ||
-        (x == end.getX() && y == end.getY());
+    for (const auto& p : parts) {
+        if (p.getX() == x && p.getY() == y) return true;
+    }
+    return false;
+}
+
+void Spring::rebuild(Direction dir, int length)
+{
+    parts.clear();
+    direction = dir;
+    oppositeDir = oppositeDirection(dir);
+
+    // אנחנו מניחים שהמיקום של האובייקט עצמו (point ב-GameObject) הוא הבסיס
+    int startX = getX();
+    int startY = getY();
+
+    int dx, dy;
+    getDelta(dir, dx, dy);
+
+    for (int i = 0; i < length; ++i)
+    {
+        // החלק הראשון (0) הוא הבסיס 'W', השאר 'w'
+        char c = (i == 0) ? 'W' : 'w';
+        parts.emplace_back(startX + (i * dx), startY + (i * dy), c);
+    }
 }
 
 void Spring::setDirection(Direction newDir)
 {
-    direction = newDir;
+    // אם משנים כיוון באמצע משחק, מסובבים את החלקים הקיימים ביחס לבסיס
+    if (parts.empty()) return;
 
-    // עדכון המטמון של הכיוון ההפוך
+    direction = newDir;
     oppositeDir = oppositeDirection(newDir);
 
-    int x = start.getX();
-    int y = start.getY();
+    Point base = parts[0];
+    int startX = base.getX();
+    int startY = base.getY();
 
-    // סידור הנקודות לפי הכיוון החדש
-    switch (direction)
+    int dx, dy;
+    getDelta(direction, dx, dy);
+
+    for (size_t i = 0; i < parts.size(); ++i)
     {
-    case Direction::UP:
-        middle.setPos(x, y - 1);
-        end.setPos(x, y - 2);
-        break;
-    case Direction::DOWN:
-        middle.setPos(x, y + 1);
-        end.setPos(x, y + 2);
-        break;
-    case Direction::LEFT:
-        middle.setPos(x - 1, y);
-        end.setPos(x - 2, y);
-        break;
-    case Direction::RIGHT:
-        middle.setPos(x + 1, y);
-        end.setPos(x + 2, y);
-        break;
-    case Direction::STAY:
-        middle.setPos(x, y);
-        end.setPos(x, y);
-        break;
+        // עדכון המיקום החדש לפי האינדקס היחסי
+        parts[i].setPos(startX + (int)i * dx, startY + (int)i * dy);
     }
 }
 
@@ -118,77 +123,91 @@ void Spring::setDirection(Direction newDir)
 
 bool Spring::handleCollision(Player& p, const Screen& screen)
 {
+    if (parts.empty()) return true;
+
     int px = p.getX();
     int py = p.getY();
 
-    bool onStart = (px == start.getX() && py == start.getY());
-    bool onMiddle = (px == middle.getX() && py == middle.getY());
-    bool onEnd = (px == end.getX() && py == end.getY());
+    // 1. בדיקה: האם השחקן עומד על אחד מחלקי הקפיץ?
+    int hitIndex = -1;
+    for (size_t i = 0; i < parts.size(); ++i) {
+        if (parts[i].getX() == px && parts[i].getY() == py) {
+            hitIndex = (int)i;
+            break;
+        }
+    }
 
-    if (!onStart && !onMiddle && !onEnd)
-        return true;
+    // השחקן לא נוגע בקפיץ
+    if (hitIndex == -1) return true;
 
     // --- מצב יציאה (Flying) ---
+    // השחקן עף מעל הקפיץ - רק ויזואליזציה (Reset למראה מקורי)
     if (p.isFlying())
     {
-        if (onStart) {
-            start.setChar('w');
-        }
-        else if (onMiddle) {
-            middle.setChar('w');
-            start.setChar('W');
-        }
-        else if (onEnd) {
-            end.setChar('w');
-            middle.setChar('w');
-            start.setChar('W');
+        for (size_t i = 0; i < parts.size(); ++i) {
+            char c = (i == 0) ? 'W' : 'w';
+            parts[i].setChar(c);
         }
         return true;
     }
 
     // --- מצב כניסה (Walking) ---
 
-    // 1. שימוש במשתנה השמור (Optimization)
-    // אם כיוון השחקן שונה מהכיוון ההפוך של הקפיץ -> חסימה
-    if (p.getDirection() != this->oppositeDir)
+    // חסימה: אפשר להיכנס רק מהכיוון ההפוך (או לעמוד עליו ב-STAY)
+    if (p.getDirection() != oppositeDir && p.getDirection() != Direction::STAY) {
+        return false; // חסימה פיזית
+    }
+
+    // שינוי ויזואלי - "דריכה"
+    parts[hitIndex].setChar('_');
+
+    // אם דורך על הבסיס (אינדקס 0) - טעינה!
+    if (hitIndex == 0)
     {
-        return false;
-    }
-
-    // 2. כניסה לקפיץ 
-    if (onEnd) {
-        end.setChar('_');
-        return true;
-    }
-
-    if (onMiddle) {
-        middle.setChar('_');
-        return true;
-    }
-
-    // 3. הגעה לבסיס - טעינה
-    if (onStart)
-    {
-        start.setChar('_');
-        middle.setChar('_');
-        end.setChar('_');
-
+        // משטחים את כל הקפיץ ויזואלית
+        for (auto& pt : parts) pt.setChar('_');
         loadSpring(p);
-        return true;
     }
 
     return true;
 }
 
-// =========================================================
-//                    LOADING LOGIC
-// =========================================================
-
 void Spring::loadSpring(Player& p)
 {
     p.stopMovement();
     p.setLoaded(true);
-
     p.setLaunchDirection(direction);
-    p.setLoadedSpringLen(getLength());
+
+    // הכוח נקבע לפי כמות החלקים שנותרו בקפיץ
+    p.setLoadedSpringLen((int)parts.size());
+}
+
+// =========================================================
+//                 EXPLOSION HANDLING
+// =========================================================
+
+bool Spring::handleExplosionAt(int x, int y)
+{
+    if (parts.empty()) return true;
+
+    for (auto it = parts.begin(); it != parts.end(); ++it)
+    {
+        if (it->getX() == x && it->getY() == y)
+        {
+            // בדיקה האם זה הבסיס (האלמנט הראשון בווקטור)
+            bool isBase = (it == parts.begin());
+
+            // מחיקת החלק מהווקטור
+            parts.erase(it);
+
+            // אם הבסיס הלך - כל הקפיץ מושמד
+            if (isBase) return true;
+
+            // יצאנו כי מחקנו איבר והאיטרטור כבר לא תקף
+            break;
+        }
+    }
+
+    // אם לא נשארו חלקים - למחוק את האובייקט
+    return parts.empty();
 }

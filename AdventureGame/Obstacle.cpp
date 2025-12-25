@@ -1,6 +1,4 @@
 ﻿#include "Obstacle.h"
-#include "Obstacle.h"
-
 #include "Player.h"
 #include "Screen.h"
 
@@ -43,7 +41,6 @@ void Obstacle::drawToBuffer(std::vector<std::string>& buffer) const
 
 int Obstacle::computeForce(const Player& player)
 {
-    // Expose the player's current push strength (kept in Player for readability).
     return player.getForce();
 }
 
@@ -104,8 +101,6 @@ void Obstacle::moveBy(int dx, int dy)
 
 bool Obstacle::isAssistingPush(const Player& other, int dx, int dy) const
 {
-    // The assisting player must be pushing in the same direction and standing adjacent
-    // to any obstacle part along that direction.
     int otherDx = 0, otherDy = 0;
     directionToDelta(other.getDirection(), otherDx, otherDy);
     if (otherDx != dx || otherDy != dy)
@@ -135,7 +130,7 @@ bool Obstacle::handleCollision(Player& p, const Screen& screen, const Player* ot
     directionToDelta(p.getDirection(), dx, dy);
 
     if (dx == 0 && dy == 0)
-        return false; // No movement intent → block to avoid undefined push.
+        return false;
 
     int totalForce = computeForce(p);
     if (otherPlayer && isAssistingPush(*otherPlayer, dx, dy))
@@ -153,4 +148,31 @@ bool Obstacle::handleCollision(Player& p, const Screen& screen, const Player* ot
 
     moveBy(dx, dy);
     return true;
+}
+
+// =========================================================
+//            EXPLOSION HANDLING (התוספת)
+// =========================================================
+
+bool Obstacle::eraseBlockAt(int x, int y)
+{
+    // משתמשים ב-parts (כמו בקוד המקורי שלך)
+    for (auto it = parts.begin(); it != parts.end(); ++it)
+    {
+        if (it->getX() == x && it->getY() == y)
+        {
+            parts.erase(it);
+
+            // עדכון המיקום הראשי של האובייקט אם החלק הראשון נמחק
+            // (חשוב כדי שפונקציות כמו getX יעבדו נכון)
+            if (!parts.empty()) {
+                setPosition(parts.front().getX(), parts.front().getY());
+            }
+
+            break; // מצאנו ומחקנו
+        }
+    }
+
+    // החזרה: האם המכשול ריק? (אם כן, ה-Game ימחק אותו לגמרי)
+    return parts.empty();
 }

@@ -106,13 +106,15 @@ void LevelLoader::createObject(char c, int x, int y, ScreenId screenId, std::vec
         gameObjects.push_back(new Door(x, y, c, screenId, -1, ScreenId::ROOM1, false)); break;
     case 'K': gameObjects.push_back(new Key(x, y, 'K', screenId, -1)); break;
     case '!': gameObjects.push_back(new Torch(x, y, '!', screenId)); break;
-    case '?':gameObjects.push_back(new Riddle(x, y, screenId));
-        break;
-	case '@': gameObjects.push_back(new Bomb(x, y, screenId)); break;
+    case '?': gameObjects.push_back(new Riddle(x, y, screenId)); break;
+    case '@': gameObjects.push_back(new Bomb(x, y, screenId)); break;
+
     case 'W':
-        // יוצרים עם אורך ברירת מחדל 3
-        gameObjects.push_back(new Spring(Point(x, y, 'W'), Point(x, y, 'w'), Point(x, y, 'w'), Direction::STAY, screenId, 3));
+        // יוצרים קפיץ זמני (ברירת מחדל אורך 3). 
+        // האורך האמיתי והכיוון יעודכנו בפונקציה parseSpringData
+        gameObjects.push_back(new Spring(Point(x, y, 'W'), Direction::STAY, screenId, 3));
         break;
+
     default: break;
     }
 }
@@ -176,29 +178,28 @@ void LevelLoader::parseSpringData(const std::string& line, std::vector<GameObjec
     int dataX, dataY;
     char dirChar;
     int screenIdInt;
-    int length = 3; // ברירת מחדל
+    int length = 3; // ערך ברירת מחדל למקרה שלא צוין אורך בקובץ
 
-    // עדכון: הוספתי קריאה של ה-length כדי שהמהירות תעבוד
+    // הקריאה כוללת כעת את length בסוף
     ss >> command >> dataX >> dataY >> dirChar >> screenIdInt >> length;
 
     GameObject* obj = findObjectAt(dataX, dataY, gameObjects);
 
-    if (obj == nullptr) return;
-
+    // הגנות: אם האובייקט לא נמצא או שהוא לא קפיץ
+    if (!obj) return;
     Spring* spring = dynamic_cast<Spring*>(obj);
-    if (spring == nullptr) return;
+    if (!spring) return;
 
     Direction dir = Direction::STAY;
-    switch (dirChar)
-    {
+    switch (dirChar) {
     case 'U': dir = Direction::UP; break;
     case 'D': dir = Direction::DOWN; break;
     case 'L': dir = Direction::LEFT; break;
     case 'R': dir = Direction::RIGHT; break;
     }
 
-    spring->setDirection(dir);
-    spring->setLength(length); // עדכון המהירות
+    // בנייה מחדש של הקפיץ עם האורך והכיוון המדויקים מהקובץ
+    spring->rebuild(dir, length);
 }
 
 void LevelLoader::parseDoorData(const std::string& line, std::vector<GameObject*>& gameObjects)

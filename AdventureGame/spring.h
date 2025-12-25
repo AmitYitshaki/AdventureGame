@@ -2,7 +2,6 @@
 
 #include <vector>
 #include <string>
-
 #include "Point.h"
 #include "ScreenID.h"
 #include "GameObject.h"
@@ -14,46 +13,52 @@ class Screen;
 
 /*
     Spring:
-    A multi-segment spring (start–middle–end) that compresses
-    when a player moves over it from the correct direction.
+    A dynamic multi-segment spring that compresses when a player
+    moves over it from the correct direction.
+    Supports dynamic length and partial destruction by explosions.
 */
 class Spring : public GameObject
 {
 public:
-    // Constructor
-    Spring(const Point& startPt,
-        const Point& middlePt,
-        const Point& endPt,
+    // בנאי: מקבל מיקום בסיס, כיוון, מסך ואורך התחלתי
+    Spring(const Point& basePosition,
         Direction dir,
         ScreenId screenId,
-        const int springLength);
+        int length);
 
     // --- Drawing ---
     void drawToBuffer(std::vector<std::string>& buffer) const;
 
-    // --- Collision ---
+    // --- Collision & Logic ---
     bool isAtPosition(int x, int y) const override;
     bool handleCollision(Player& p, const Screen& screen) override;
 
-    // --- Spring Properties ---
+    // --- Explosion Handling ---
+    // מוחקת חלק מהקפיץ שנפגע. 
+    // מחזירה true אם הקפיץ הושמד כליל (אם הבסיס נפגע או לא נשארו חלקים)
+    bool handleExplosionAt(int x, int y);
+
+    // --- Properties ---
+    void setDirection(Direction newDir); // מעדכנת כיוון לכל החלקים הקיימים
     Direction getDirection() const { return direction; }
     Direction getOppositeDirection() const { return oppositeDir; }
-    int getLength() const { return springLength; }
-	void setLength(int length) { springLength = length; }
 
-    // Helper: calculate opposite direction
-    static Direction oppositeDirection(Direction d);
+    // הכוח שווה למספר החלקים שנותרו כרגע
+    int getLength() const { return (int)parts.size(); }
 
-    void setDirection(Direction newDir);
+    // פונקציה לבניית הקפיץ מחדש (נקראת ע"י LevelLoader לטעינת נתונים)
+    void rebuild(Direction dir, int length);
 
 private:
-    Point start;
-    Point middle;
-    Point end;
+    // parts[0] תמיד יהיה הבסיס (החלק שטוען את הקפיץ)
+    std::vector<Point> parts;
+
     Direction direction;
-    int springLength;
-    // Member to cache the opposite direction (optimization)
     Direction oppositeDir;
 
     void loadSpring(Player& p);
+
+    // פונקציות עזר פנימיות
+    static void getDelta(Direction d, int& dx, int& dy);
+    static Direction oppositeDirection(Direction d);
 };
