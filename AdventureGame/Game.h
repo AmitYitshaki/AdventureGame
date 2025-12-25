@@ -126,6 +126,7 @@ private:
     void pauseScreen();
 
     void explodeCell(int x, int y, Screen& screen);
+    void visualizeExplosion(int cx, int cy, int radius);
 
     void updateBombs();
     void applyBombEffects(int cx, int cy, Screen& curr_screen, int R);

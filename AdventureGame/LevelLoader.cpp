@@ -6,6 +6,7 @@
 #include "Torch.h"
 #include "Riddle.h"
 #include "spring.h"
+#include "Bomb.h"
 #include "Obstacle.h" 
 #include "Direction.h"
 
@@ -79,13 +80,14 @@ std::vector<GameObject*> LevelLoader::collectLaserBeam(Laser* startNode, const s
     {
         scanDirection(startX, startY, 0, -1, '|', allObjects, beam); // למעלה
         scanDirection(startX, startY, 0, 1, '|', allObjects, beam);  // למטה
+	}
     if (type == '-') {
-        scanDirection(x, y, -1, 0, '-', allObjects, beam);
-        scanDirection(x, y, 1, 0, '-', allObjects, beam); 
+        scanDirection(startX, startY, -1, 0, '-', allObjects, beam);
+        scanDirection(startX, startY, 1, 0, '-', allObjects, beam);
     }                                                     
     else if (type == '|') {                               
-        scanDirection(x, y, 0, -1, '|', allObjects, beam);
-        scanDirection(x, y, 0, 1, '|', allObjects, beam);
+        scanDirection(startX, startY, 0, -1, '|', allObjects, beam);
+        scanDirection(startX, startY, 0, 1, '|', allObjects, beam);
     }
 
     return beam;
@@ -106,6 +108,7 @@ void LevelLoader::createObject(char c, int x, int y, ScreenId screenId, std::vec
     case '!': gameObjects.push_back(new Torch(x, y, '!', screenId)); break;
     case '?':gameObjects.push_back(new Riddle(x, y, screenId));
         break;
+	case '@': gameObjects.push_back(new Bomb(x, y, screenId)); break;
     case 'W':
         // יוצרים עם אורך ברירת מחדל 3
         gameObjects.push_back(new Spring(Point(x, y, 'W'), Point(x, y, 'w'), Point(x, y, 'w'), Direction::STAY, screenId, 3));

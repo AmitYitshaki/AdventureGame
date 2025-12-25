@@ -30,19 +30,32 @@ bool Bomb::handleCollision(Player& p, const Screen& screen)
 bool Bomb::tick()
 {
     if (!active)
-        return false; 
+        return false;
 
-	// לא פעילה (הוסרה), לא סופרת לאחור
+    // הגנה: אם הפצצה כבר הוסרה מהלוח, לא נחשב
     if (getX() < 0 || getY() < 0)
         return false;
 
-    if (--ticksLeft <= 0)       
-    {
-        active = false;  
-        exploded = true;
-        return true;
+    // --- שינוי ויזואלי: ספירה לאחור ---
+    // רק ב-9 הטיקים האחרונים נציג מספרים (9..1)
+    if (ticksLeft > 16 && ticksLeft <= 24) {
+        setChar('3');
+    }
+    else if (ticksLeft > 8 && ticksLeft <= 16 ) {
+        setChar('2');
+    }
+    else if (ticksLeft > 0 && ticksLeft <= 8) {
+        setChar('1');
     }
 
-    return false;             
+    // הפחתת הטיימר
+    if (--ticksLeft <= 0)
+    {
+        active = false;
+        exploded = true;
+        return true; // הפצצה התפוצצה בטיק הזה!
+    }
+
+    return false;
 }
 

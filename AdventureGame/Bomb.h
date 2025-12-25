@@ -14,7 +14,7 @@ class Bomb : public GameObject
 private:
 	bool active = false;        // האם הפצצה פעילה (סופרת לאחור)
 	bool exploded = false;
-	static constexpr int COUNTDOWN_TICKS = 5; // מספר הטיקים עד הפיצוץ	
+	static constexpr int COUNTDOWN_TICKS = 24; // מספר הטיקים עד הפיצוץ	
 	int ticksLeft = COUNTDOWN_TICKS; // טיקים שנותרו עד הפיצוץ
 	static constexpr int EXPLOSION_RADIUS = 3; // רדיוס הפיצוץ
 public:

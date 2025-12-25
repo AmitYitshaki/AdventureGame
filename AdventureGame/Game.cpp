@@ -386,19 +386,30 @@ void Game::updateBombs()
     for (auto obj : gameObjects)
     {
         auto bomb = dynamic_cast<Bomb*>(obj);
+        // מסננים: רק פצצות, רק במסך הנוכחי
         if (!bomb) continue;
         if (bomb->getScreenId() != curr_screen) continue;
 
+        // קידום הטיימר
         if (bomb->tick())
         {
-            Point c = bomb->getPoint(); // מרכז הפיצוץ
-            applyBombEffects(c.getX(), c.getY(), *currentScreen, Bomb::getExplosionRadius()); // apply effects to surrounding area
+            // --- הפצצה התפוצצה! ---
+            Point c = bomb->getPoint();
+            int radius = Bomb::getExplosionRadius();
+
+            // 1. אפקט ויזואלי (Hit Freeze)
+            visualizeExplosion(c.getX(), c.getY(), radius);
+
+            // 2. חישוב נזק והרס סביבתי
+            applyBombEffects(c.getX(), c.getY(), *currentScreen, radius);
+
+            // 3. מחיקת הפצצה מהמשחק
             bomb->removeFromGame();
+
             setStatusMessage("BOOM!");
         }
     }
 }
-
 
 void Game::update()
 {
@@ -892,41 +903,86 @@ void Game::applyBombEffects(int cx, int cy, Screen& curr_screen, int R)
 
 void Game::explodeCell(int x, int y, Screen& screen)
 {
-    ScreenId curr_screen = screen.getScreenId(); // אם אין לך - תגיד ואני אעשה גרסה עם sid פרמטר
+    ScreenId curr_screen = screen.getScreenId();
 
-    if (player1.getX() == x && player1.getY() == y)
-        player1.decreaseLife();   // תחליף לשם הפונקציה שיש אצלך
+    // 1. פגיעה בשחקנים
+    if (player1.getX() == x && player1.getY() == y) {
+        player1.decreaseLife();
+        // אופציונלי: להעיף את השחקן אחורה או רק להוריד חיים
+    }
 
-    if (player2.getX() == x && player2.getY() == y)
+    if (player2.getX() == x && player2.getY() == y) {
         player2.decreaseLife();
+    }
 
+    // 2. הרס קירות (עם הגנות)
+    // א. הגנה על מסגרת המסך (הגבול החיצוני)
+    bool isBorder = (x == 0 || x == Screen::WIDTH - 1 || y == 0 || y == Screen::HEIGHT - 1);
 
+    // ב. הגנה על אזור ה-Legend (אם קיים במסך הזה)
+    bool isLegendArea = false;
+    if (screen.hasLegendDefined())
+    {
+        Point lPos = screen.getLegendStart();
+        // ה-Legend הוא ברווח 75 וגובה 3 שורות
+        if (x >= lPos.getX() && x < lPos.getX() + Screen::LEGEND_WIDTH &&
+            y >= lPos.getY() && y <= lPos.getY() + 2)
+        {
+            isLegendArea = true;
+        }
+    }
+
+    // ביצוע ההרס לקיר בלבד אם הוא לא מוגן
+    if (!isBorder && !isLegendArea)
+    {
+        // אנחנו בודקים בזיכרון של המסך אם יש שם קיר
+        if (screen.getLine(y)[x] == '#') {
+            screen.setChar(x, y, ' '); // הופך לאוויר
+        }
+    }
+
+    // 3. מחיקת אובייקטים אחרים (אויבים/חפצים)
     for (GameObject* obj : gameObjects)
     {
         if (!obj) continue;
+        if (obj->getScreenId() != curr_screen) continue;
+        if (obj->getX() < 0 || obj->getY() < 0) continue; // כבר מחוק
+        if (obj->isCollected()) continue; // בתיק
 
-        // רק מה שבאותו מסך
-        if (obj->getScreenId() != curr_screen)
-            continue;
-
-        // אם כבר הוסר (soft delete)
-        if (obj->getX() < 0 || obj->getY() < 0)
-            continue;
-
-        // אם במלאי של שחקן - לא נמחק
-        if (obj->isCollected())
-            continue;
-
-        // אם הוא בתא הפיצוץ
         if (obj->isAtPosition(x, y))
         {
-            // לא למחוק פצצות (כולל את זו שהתפוצצה) כדי לא לעשות בלגן/שרשרת כרגע
-            if (dynamic_cast<Bomb*>(obj))
-                continue;
+            // לא מוחקים פצצות אחרות כדי למנוע באגים של שרשרת כרגע
+            if (dynamic_cast<Bomb*>(obj)) continue;
 
             obj->removeFromGame();
         }
     }
+}
+
+
+void Game::visualizeExplosion(int cx, int cy, int radius)
+{
+    // לולאה שמכסה את ריבוע הפיצוץ
+    for (int y = cy - radius; y <= cy + radius; ++y)
+    {
+        for (int x = cx - radius; x <= cx + radius; ++x)
+        {
+            // בדיקת גבולות מסך (כדי לא לצייר מחוץ לקונסול)
+            if (x >= 0 && x < Screen::WIDTH && y >= 0 && y < Screen::HEIGHT)
+            {
+                // ציור כוכבית ישירות למסך
+                gotoxy(x, y);
+                std::cout << "+";
+                // אפשר להוסיף צבעים כאן אם תרצו בעתיד
+            }
+        }
+    }
+
+    // החזרת הסמן למקום ניטרלי
+    gotoxy(0, 0);
+
+    // הקפאה רגעית ("Hit Freeze") להעצמת האפקט
+    Sleep(150);
 }
 
 /* ============================================================

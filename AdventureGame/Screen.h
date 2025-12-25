@@ -11,42 +11,40 @@ public:
     static constexpr int WIDTH = 80;
     static constexpr int HEIGHT = 25;
 
+    // הוספתי את הקבוע הזה שדיברנו עליו בחידות/מקרא כדי שיהיה זמין לכולם
+    static constexpr int LEGEND_WIDTH = 75;
+
     Screen() : screenID(ScreenId::HOME) {}
     Screen(ScreenId screenID) : screenID(screenID) {}
 
     // --- Drawing ---
     void draw() const; // מימוש ב-cpp
 
-    // --- Queries & Getters ---
-    bool isWall(const Point& p) const {
-        if (p.getY() >= 0 && p.getY() < layout.size() && p.getX() >= 0 && p.getX() < layout[p.getY()].size())
-            return layout[p.getY()][p.getX()] == '#';
-        return false;
     // --- Queries ---
+
+    // בודק אם קואורדינטות נמצאות בתוך הגבולות
     bool inBounds(int x, int y) const
     {
         return y >= 0 && y < (int)layout.size() &&
             x >= 0 && x < (int)layout[y].size();
     }
 
+    // העמסה שמקבלת נקודה
     bool inBounds(const Point& p) const
     {
         return inBounds(p.getX(), p.getY());
     }
 
+    // בדיקת קיר (איחדתי את הגרסאות שלך לאחת נכונה ובטוחה)
     bool isWall(const Point& p) const
     {
-        if (!inBounds(p)) return false;
+        if (!inBounds(p)) return false; // הגנה מקריסה
         return layout[p.getY()][p.getX()] == '#';
     }
 
+    // --- Getters & Setters ---
     ScreenId getScreenId() const { return screenID; }
     void setScreenId(ScreenId id) { screenID = id; }
-
-    ScreenId getScreenId() const
-    {
-        return screenID;
-    }
 
     bool isDark() const { return dark; }
     void setDark(bool isDark) { dark = isDark; }
@@ -55,7 +53,7 @@ public:
     void setLayout(const std::vector<std::string>& newLayout) { layout = newLayout; }
 
     std::string getLine(int row) const {
-        if (row >= 0 && row < layout.size()) return layout[row];
+        if (row >= 0 && row < (int)layout.size()) return layout[row];
         return "";
     }
 
@@ -67,7 +65,7 @@ public:
     }
 
     void setChar(int x, int y, char c) {
-        if (y >= 0 && y < layout.size() && x >= 0 && x < layout[y].size()) {
+        if (inBounds(x, y)) {
             layout[y][x] = c;
         }
     }
@@ -78,7 +76,7 @@ public:
     Point getStartPos1() const { return startPos1; }
     Point getStartPos2() const { return startPos2; }
 
-    // --- Legend Position (NEW) ---
+    // --- Legend Position ---
     void setLegendStart(int x, int y) { legendStart.setPos(x, y); hasLegend = true; }
     Point getLegendStart() const { return legendStart; }
     bool hasLegendDefined() const { return hasLegend; }
