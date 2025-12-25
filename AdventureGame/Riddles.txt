@@ -1,0 +1,220 @@
+SHUFFLE: TRUE
+
+[RIDDLE]
+ID: 1
+ANSWER: 2
+TEXT
+#########################################################################
+#                                                                       #
+#                        C++ RIDDLE MASTER                              #
+#                                                                       #
+#   What is the output of the following code?                           #
+#   int x = 5; std::cout << x++;                                        #
+#                                                                       #
+#   1) 6                                                                #
+#   2) 5                                                                #
+#   3) Undefined Behavior                                               #
+#   4) Compilation Error                                                #
+#                                                                       #
+#########################################################################
+END_TEXT
+
+[RIDDLE]
+ID: 2
+ANSWER: 1
+TEXT
+#########################################################################
+#                                                                       #
+#                        C++ RIDDLE MASTER                              #
+#                                                                       #
+#   Which feature allows a class to act like an interface in C++?       #
+#                                                                       #
+#   1) Pure virtual functions                                           #
+#   2) Virtual inheritance                                              #
+#   3) Templates                                                        #
+#   4) Friend classes                                                   #
+#                                                                       #
+#########################################################################
+END_TEXT
+
+[RIDDLE]
+ID: 3
+ANSWER: 3
+TEXT
+#########################################################################
+#                                                                       #
+#                        C++ RIDDLE MASTER                              #
+#                                                                       #
+#   How do you correctly free an array allocated with 'new int[10]'?    #
+#                                                                       #
+#   1) delete ptr;                                                      #
+#   2) free(ptr);                                                       #
+#   3) delete[] ptr;                                                    #
+#   4) remove(ptr);                                                     #
+#                                                                       #
+#########################################################################
+END_TEXT
+
+[RIDDLE]
+ID: 4
+ANSWER: 2
+TEXT
+#########################################################################
+#                                                                       #
+#                        C++ RIDDLE MASTER                              #
+#                                                                       #
+#   When is a 'static' local variable initialized?                      #
+#                                                                       #
+#   1) Every time the function is called                                #
+#   2) The first time control passes through its declaration            #
+#   3) At program startup, before main()                                #
+#   4) It is never initialized automatically                            #
+#                                                                       #
+#########################################################################
+END_TEXT
+
+[RIDDLE]
+ID: 5
+ANSWER: 4
+TEXT
+#########################################################################
+#                                                                       #
+#                        C++ RIDDLE MASTER                              #
+#                                                                       #
+#   What is the size of a 'char' in C++ (in bytes)?                     #
+#                                                                       #
+#   1) Depends on the OS                                                #
+#   2) 4 bytes                                                          #
+#   3) 2 bytes                                                          #
+#   4) Always 1 byte                                                    #
+#                                                                       #
+#########################################################################
+END_TEXT
+
+[RIDDLE]
+ID: 6
+ANSWER: 1
+TEXT
+#########################################################################
+#                                                                       #
+#                        C++ RIDDLE MASTER                              #
+#                                                                       #
+#   In inheritance, which constructor is called first?                  #
+#                                                                       #
+#   1) Base class constructor                                           #
+#   2) Derived class constructor                                        #
+#   3) Virtual constructor                                              #
+#   4) It is random                                                     #
+#                                                                       #
+#########################################################################
+END_TEXT
+
+[RIDDLE]
+ID: 7
+ANSWER: 2
+TEXT
+#########################################################################
+#                                                                       #
+#                        C++ RIDDLE MASTER                              #
+#                                                                       #
+#   In inheritance, which destructor is called first?                   #
+#                                                                       #
+#   1) Base class destructor                                            #
+#   2) Derived class destructor                                         #
+#   3) They are called simultaneously                                   #
+#   4) None of the above                                                #
+#                                                                       #
+#########################################################################
+END_TEXT
+
+[RIDDLE]
+ID: 8
+ANSWER: 3
+TEXT
+#########################################################################
+#                                                                       #
+#                        C++ RIDDLE MASTER                              #
+#                                                                       #
+#   What happens if you dereference a null pointer?                     #
+#   int* p = nullptr; *p = 10;                                          #
+#                                                                       #
+#   1) p becomes 10                                                     #
+#   2) Compilation Error                                                #
+#   3) Undefined Behavior (usually crash)                               #
+#   4) Nothing happens                                                  #
+#                                                                       #
+#########################################################################
+END_TEXT
+
+[RIDDLE]
+ID: 9
+ANSWER: 1
+TEXT
+#########################################################################
+#                                                                       #
+#                        C++ RIDDLE MASTER                              #
+#                                                                       #
+#   Which keyword is used to access private members from outside?       #
+#                                                                       #
+#   1) friend                                                           #
+#   2) public                                                           #
+#   3) protected                                                        #
+#   4) virtual                                                          #
+#                                                                       #
+#########################################################################
+END_TEXT
+
+[RIDDLE]
+ID: 10
+ANSWER: 2
+TEXT
+#########################################################################
+#                                                                       #
+#                        C++ RIDDLE MASTER                              #
+#                                                                       #
+#   What is the purpose of 'const' after a function declaration?        #
+#   void foo() const;                                                   #
+#                                                                       #
+#   1) It returns a constant value                                      #
+#   2) It cannot modify member variables of the class                   #
+#   3) The function cannot be called                                    #
+#   4) It makes the function run faster                                 #
+#                                                                       #
+#########################################################################
+END_TEXT
+
+[RIDDLE]
+ID: 11
+ANSWER: 4
+TEXT
+#########################################################################
+#                                                                       #
+#                        C++ RIDDLE MASTER                              #
+#                                                                       #
+#   Polymorphism in C++ works with:                                     #
+#                                                                       #
+#   1) Only value types                                                 #
+#   2) Only static methods                                              #
+#   3) Only Arrays                                                      #
+#   4) Pointers or References to base class                             #
+#                                                                       #
+#########################################################################
+END_TEXT
+
+[RIDDLE]
+ID: 12
+ANSWER: 3
+TEXT
+#########################################################################
+#                                                                       #
+#                        C++ RIDDLE MASTER                              #
+#                                                                       #
+#   What does the 'break' statement do in a loop?                       #
+#                                                                       #
+#   1) Restarts the loop                                                #
+#   2) Skips the current iteration                                      #
+#   3) Terminates the loop immediately                                  #
+#   4) Pauses the program                                               #
+#                                                                       #
+#########################################################################
+END_TEXT
