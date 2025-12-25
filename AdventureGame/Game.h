@@ -17,6 +17,7 @@
 #include "Obstacle.h"
 #include "LevelLoader.h"
 #include "Logger.h"
+#include "Bomb.h"
 
 
 /*
@@ -51,7 +52,7 @@ private:
     // ============================================================
     //                INTERNAL GAME STATE & DATA
     // ============================================================
-	static constexpr int TICK_MS = 128; // Game tick duration in milliseconds(for the sleep function)
+    static constexpr int TICK_MS = 128; // Game tick duration in milliseconds(for the sleep function)
 
     Player player1;
     Player player2;
@@ -67,7 +68,7 @@ private:
     Riddle* currentRiddle = nullptr;
     Player* currentRiddlePlayer = nullptr;
 
-    bool debugMode = false; 
+    bool debugMode = false;
 
     static std::string statusMessage;
 
@@ -116,4 +117,9 @@ private:
 
     // Pause screen
     void pauseScreen();
+
+    void explodeCell(int x, int y, Screen& screen);
+
+    void updateBombs();
+    void applyBombEffects(int cx, int cy, Screen& curr_screen, int R);
 };

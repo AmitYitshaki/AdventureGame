@@ -4,6 +4,7 @@
 #include "Key.h"
 #include "Torch.h"
 #include "Riddle.h"
+#include "Bomb.h"
 #include "Door.h"
 #include "Game.h"
 #include "Obstacle.h"
@@ -298,7 +299,14 @@ GameObject* Player::dropItemToScreen(ScreenId currentScreenID)
     itemToDrop->setScreenId(currentScreenID);
     itemToDrop->drop();
 
-    Game::setStatusMessage(std::string("Dropped item '") + itemToDrop->getChar() + "'");
+    if (itemToDrop->getChar() == '@')
+    {
+        static_cast<Bomb*>(itemToDrop)->activate();
+        Game::setStatusMessage("Bomb activated! RUN!"); 
+    }
+
+    else 
+        Game::setStatusMessage(std::string("Dropped item '") + itemToDrop->getChar() + "'");
 
     heldItem = nullptr;
     return itemToDrop;
