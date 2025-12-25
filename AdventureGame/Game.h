@@ -3,6 +3,11 @@
 // Core includes
 #include <vector>
 #include <string>
+#include <algorithm> // std::shuffle, std::sort, std::reverse
+#include <random>    // std::default_random_engine
+#include <chrono>    // std::chrono
+#include <fstream>
+#include <sstream>
 
 // Project includes
 #include "Player.h"
@@ -66,6 +71,7 @@ private:
     bool RiddleMode = false;
 
     Riddle* currentRiddle = nullptr;
+    std::vector<RiddleData> riddlesPool;
     Player* currentRiddlePlayer = nullptr;
 
     bool debugMode = false;
@@ -111,7 +117,8 @@ private:
 
     // Riddle activation
     void startRiddle(Riddle* riddle, Player& p);
-
+    void loadRiddlesFromFile(const std::string& filename);
+    void assignRiddlesToLevel();
     // Navigation
     void goToScreen(ScreenId id);
 
