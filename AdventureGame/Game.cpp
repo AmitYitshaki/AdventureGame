@@ -359,11 +359,11 @@ void Game::drawDebugDashboard()
 void Game::draw()
 {
     auto buffer = initBuffer();
-	
+    
     drawObjectsToBuffer(buffer);
     drawPlayersToBuffer(buffer);
-    drawLegendToBuffer(buffer);
     applyLighting(buffer);
+    drawLegendToBuffer(buffer);
 
     if (RiddleMode && currentRiddle)
         drawRiddle(buffer);
@@ -674,7 +674,7 @@ void Game::goToScreen(ScreenId id)
     player2.initForLevel(start2.getX(), start2.getY(), '&', id);
 
     setStatusMessage("");
-    if (currentScreen->isDark()) setStatusMessage("Dark room... Try a Torch!");
+    if (currentScreen->isDark()) setStatusMessage("Dark Room,Try Torch!");
     assignRiddlesToLevel();
 }
 
