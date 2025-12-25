@@ -25,10 +25,23 @@ public:
     void draw() const;
 
     // --- Queries ---
+    bool inBounds(int x, int y) const
+    {
+        return y >= 0 && y < (int)layout.size() &&
+            x >= 0 && x < (int)layout[y].size();
+    }
+
+    bool inBounds(const Point& p) const
+    {
+        return inBounds(p.getX(), p.getY());
+    }
+
     bool isWall(const Point& p) const
     {
+        if (!inBounds(p)) return false;
         return layout[p.getY()][p.getX()] == '#';
     }
+
 
     ScreenId getScreenId() const
     {

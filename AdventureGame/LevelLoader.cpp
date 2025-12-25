@@ -63,9 +63,9 @@ std::vector<GameObject*> LevelLoader::collectLaserBeam(Laser* startNode, const s
 
     if (type == '-') {
         scanDirection(x, y, -1, 0, '-', allObjects, beam);
-        scanDirection(x, y, 1, 0, '-', allObjects, beam);
-    }
-    else if (type == '|') {
+        scanDirection(x, y, 1, 0, '-', allObjects, beam); 
+    }                                                     
+    else if (type == '|') {                               
         scanDirection(x, y, 0, -1, '|', allObjects, beam);
         scanDirection(x, y, 0, 1, '|', allObjects, beam);
     }

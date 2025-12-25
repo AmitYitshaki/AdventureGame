@@ -1,0 +1,61 @@
+
+
+---------------------------------------------------------------------------
+|                                                                         |
+|                           C++ RIDDLE 1                                  |
+|                                                                         |
+|  What will the following code print?                                    |
+|                                                                         |
+|     int x = 5;                                                          |
+|     cout << x++ * ++x;                                                  |
+|                                                                         |
+|     1) Undefined behavior                                               |
+|     2) 30                                                               |
+|     3) 36                                                               |
+|     4) Compilation error                                                |
+|                                                                         |
+|   (Press the corresponding number 1-4 to answer)                        |
+|                                                                         |
+|                                                                         |
+|                                                                         |
+|                                                                         |
+---------------------------------------------------------------------------
+
+
+---------------------------------------------------------------------------
+|                                                                         |
+|                           C++ RIDDLE 2                                  |
+|                                                                         |
+|  Which statement about references in C++ is TRUE?                       |
+|                                                                         |
+|     1) A reference must always be initialized when declared             |
+|     2) A reference can be reseated to another variable                  |
+|     3) A reference can be null                                          |
+|     4) References and pointers behave identically                       |
+|                                                                         |
+|   (Press the corresponding number 1-4 to answer)                        |
+|                                                                         |
+|                                                                         |
+|                                                                         |
+|                                                                         |
+---------------------------------------------------------------------------
+
+
+
+---------------------------------------------------------------------------
+|                                                                         |
+|                           C++ RIDDLE 3                                  |
+|                                                                         |
+|  When is a destructor called in C++?                                    |
+|                                                                         |
+|     1) Automatically when an object goes out of scope                   |
+|     2) Only when `delete` is called                                     |
+|     3) Only when the program ends                                       |
+|     4) Never, unless called manually                                    |
+|                                                                         |
+|   (Press the corresponding number 1-4 to answer)                        |
+|                                                                         |
+|                                                                         |
+|                                                                         |
+|                                                                         |
+---------------------------------------------------------------------------

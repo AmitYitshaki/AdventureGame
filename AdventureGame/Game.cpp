@@ -247,6 +247,28 @@ void Game::draw()
                           UPDATE
    ============================================================ */
 
+
+void Game::updateBombs()
+{
+    ScreenId curr_screen = currentScreen->getScreenId();
+
+    for (auto obj : gameObjects)
+    {
+        auto bomb = dynamic_cast<Bomb*>(obj);
+        if (!bomb) continue;
+        if (bomb->getScreenId() != curr_screen) continue;
+
+        if (bomb->tick())
+        {
+            Point c = bomb->getPoint(); // מרכז הפיצוץ
+            applyBombEffects(c.getX(), c.getY(), *currentScreen, Bomb::getExplosionRadius()); // apply effects to surrounding area
+            bomb->removeFromGame();
+            setStatusMessage("BOOM!");
+        }
+    }
+}
+
+
 void Game::update()
 {
     int steps1 = player1.isFlying() ? 3 : 1;
@@ -284,7 +306,11 @@ void Game::update()
         else if (player2.hasRiddle())
             startRiddle(player2.getHeldRiddle(), player2);
     }
+    
+	updateBombs();
 }
+
+
 
 /* ============================================================
                            INPUT
@@ -621,6 +647,58 @@ void Game::pauseScreen()
                 setStatusMessage("");
                 return;
             }
+        }
+    }
+}
+
+void Game::applyBombEffects(int cx, int cy, Screen& curr_screen, int R)
+{
+    for (int y = cy - R; y <= cy + R; ++y)
+    {
+        for (int x = cx - R; x <= cx + R; ++x)
+        {
+            if (!curr_screen.inBounds(x, y)) continue;
+            explodeCell(x, y, curr_screen);
+        }
+    }
+}
+
+
+void Game::explodeCell(int x, int y, Screen& screen)
+{
+    ScreenId curr_screen = screen.getScreenId(); // אם אין לך - תגיד ואני אעשה גרסה עם sid פרמטר
+
+    if (player1.getX() == x && player1.getY() == y)
+        player1.decreaseLife();   // תחליף לשם הפונקציה שיש אצלך
+
+    if (player2.getX() == x && player2.getY() == y)
+        player2.decreaseLife();
+
+
+    for (GameObject* obj : gameObjects)
+    {
+        if (!obj) continue;
+
+        // רק מה שבאותו מסך
+        if (obj->getScreenId() != curr_screen)
+            continue;
+
+        // אם כבר הוסר (soft delete)
+        if (obj->getX() < 0 || obj->getY() < 0)
+            continue;
+
+        // אם במלאי של שחקן - לא נמחק
+        if (obj->isCollected())
+            continue;
+
+        // אם הוא בתא הפיצוץ
+        if (obj->isAtPosition(x, y))
+        {
+            // לא למחוק פצצות (כולל את זו שהתפוצצה) כדי לא לעשות בלגן/שרשרת כרגע
+            if (dynamic_cast<Bomb*>(obj))
+                continue;
+
+            obj->removeFromGame();
         }
     }
 }
