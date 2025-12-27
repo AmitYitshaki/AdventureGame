@@ -55,154 +55,81 @@ void Player::resetForNewGame(int x, int y, char c, int hudPos, ScreenId startLev
 
 
 /* ----------------------------------------------------
-                    NORMAL MOVEMENT
+                     MOVEMENT
    ---------------------------------------------------- */
 
-void Player::move(Screen& screen, std::vector<GameObject*>& gameObjects, const Player* otherPlayer)
+void Player::calculateMovementDelta(int& dx, int& dy) const
 {
-	if (point.getX() == -1 || point.getY() == -1) //if player is off-screen
-    {
-        return;
-    }
-	if (isLoaded()) //player is in loaded state
-    {
-        return;
-    }
-    // If flying due to spring effect → redirect movement
+    dx = 0; dy = 0;
+
+    // לוגיקה לתעופה (Spring)
     if (isFlying())
     {
-        moveFlying(screen, gameObjects, otherPlayer);
-        return;
-    }
-
-    int dx = 0, dy = 0;
-
-    switch (dir)
-    {
-    case Direction::UP:    dy = -1; break;
-    case Direction::DOWN:  dy = 1; break;
-    case Direction::LEFT:  dx = -1; break;
-    case Direction::RIGHT: dx = 1; break;
-    case Direction::STAY:  return;
-    }
-
-    Point next(point.getX() + dx, point.getY() + dy, ' ');
-
-    // Prevent stepping into the other player if they are stationary on the target tile
-    if (otherPlayer)
-    {
-        if (otherPlayer->getX() == next.getX() &&
-            otherPlayer->getY() == next.getY() &&
-            otherPlayer->getDirection() == Direction::STAY)
+        // כיוון בסיסי לפי השיגור
+        switch (launchDirection)
         {
-            stopMovement();
-            return;
+        case Direction::UP:    dy = -1; break;
+        case Direction::DOWN:  dy = 1;  break;
+        case Direction::LEFT:  dx = -1; break;
+        case Direction::RIGHT: dx = 1;  break;
         }
+
+        // הטיה (Steering) תוך כדי תעופה
+        if (dir == Direction::UP)    dy -= 1;
+        else if (dir == Direction::DOWN) dy += 1;
     }
-
-    // Wall collision stopping regular movement
-    if (screen.isWall(next))
+    // לוגיקה להליכה רגילה
+    else
     {
-        stopMovement();
-        return;
-    }
-
-    // Move
-    point.move(dx, dy);
-
-    // Handle collisions with game objects
-    ScreenId currentScreenId = screen.getScreenId();
-    int px = point.getX();
-    int py = point.getY();
-
-    for (auto obj : gameObjects)
-    {
-        if (obj->getScreenId() != currentScreenId)
-            continue;
-
-        if (obj->isAtPosition(px, py) && !obj->isCollected())
+        switch (dir)
         {
-			bool allowed = true;    //initially assume movement is allowed(will change if collision says otherwise)
-            if (auto obstacle = dynamic_cast<Obstacle*>(obj))
-            {
-                allowed = obstacle->handleCollision(*this, screen, otherPlayer, gameObjects);
-            }
-            else
-            {
-                allowed = obj->handleCollision(*this, screen);
-            }
-            if (!allowed)
-            {
-                // Undo movement
-                point.move(-dx, -dy);
-                dir = Direction::STAY;
-            }
+        case Direction::UP:    dy = -1; break;
+        case Direction::DOWN:  dy = 1;  break;
+        case Direction::LEFT:  dx = -1; break;
+        case Direction::RIGHT: dx = 1;  break;
         }
     }
 }
 
-/* ----------------------------------------------------
-                SPRING / FLYING MOVEMENT
-   ---------------------------------------------------- */
-
-void Player::moveFlying(Screen& screen, std::vector<GameObject*>& gameObjects, const Player* otherPlayer)
+bool Player::isBlockedByStatic(int x, int y, const Screen& screen, const Player* otherPlayer) const
 {
-    int dx = 0, dy = 0;
-
-    // Base launch direction from spring
-    switch (launchDirection)
-    {
-    case Direction::UP:    dy = -1; break;
-    case Direction::DOWN:  dy = 1; break;
-    case Direction::LEFT:  dx = -1; break;
-    case Direction::RIGHT: dx = 1; break;
-    default:
-        return;
+    // 1. בדיקת קירות
+    if (screen.isWall(Point(x, y, ' '))) {
+        return true;
     }
 
-    // Allow vertical deviation inputs while flying
-    if (dir == Direction::UP)        dy -= 1;
-    else if (dir == Direction::DOWN) dy += 1;
-
-    Point next(point.getX() + dx, point.getY() + dy, ' ');
-
-    // Prevent flying into a stationary other player
+    // 2. בדיקת שחקן אחר (רק אם הוא קיים ונמצא ב-STAY)
     if (otherPlayer)
     {
-        if (otherPlayer->getX() == next.getX() &&
-            otherPlayer->getY() == next.getY() &&
+        if (otherPlayer->getX() == x &&
+            otherPlayer->getY() == y &&
             otherPlayer->getDirection() == Direction::STAY)
         {
-            stopSpringEffect();
-            return;
+            return true;
         }
     }
 
+    return false;
+}
 
-    // Wall collision stops spring effect
-    if (screen.isWall(next))
-    {
-        stopSpringEffect();
-        return;
-    }
-
-    // Move
-    point.move(dx, dy);
-
-    // Handle collisions with other objects
+bool Player::handleObjectInteractions(const Screen& screen, std::vector<GameObject*>& gameObjects, const Player* otherPlayer)
+{
     ScreenId currentScreenId = screen.getScreenId();
     int px = point.getX();
     int py = point.getY();
 
     for (auto obj : gameObjects)
     {
-        if (obj->getScreenId() != currentScreenId)
+        // סינונים מהירים
+        if (!obj || obj->getScreenId() != currentScreenId || obj->isCollected())
             continue;
 
-        if (obj->isAtPosition(px, py) && !obj->isCollected())
+        // האם דרכנו על האובייקט?
+        if (obj->isAtPosition(px, py))
         {
             bool allowed = true;
 
+            // טיפול ספציפי למכשול (דורש את השחקן השני לדחיפה)
             if (auto obstacle = dynamic_cast<Obstacle*>(obj))
             {
                 allowed = obstacle->handleCollision(*this, screen, otherPlayer, gameObjects);
@@ -212,16 +139,59 @@ void Player::moveFlying(Screen& screen, std::vector<GameObject*>& gameObjects, c
                 allowed = obj->handleCollision(*this, screen);
             }
 
-            if (!allowed)
-            {
-                // Undo movement and end spring effect
-                point.move(-dx, -dy);
-                stopSpringEffect();
-                return;
-            }
+            // אם האובייקט חסם אותנו
+            if (!allowed) return false;
         }
     }
+    return true; // הכל עבר בשלום
 }
+
+void Player::handleStop()
+{
+    if (isFlying()) {
+        stopSpringEffect();
+    }
+    else {
+        stopMovement(); // מאפס כיוון ל-STAY
+    }
+}
+
+void Player::move(Screen& screen, std::vector<GameObject*>& gameObjects, const Player* otherPlayer)
+{
+    // 1. בדיקות מקדימות
+    if (point.getX() == -1 || isLoaded()) return;
+
+    // 2. חישוב לאן רוצים לזוז
+    int dx = 0, dy = 0;
+    calculateMovementDelta(dx, dy);
+
+    // אם אין תזוזה, אין מה להמשיך
+    if (dx == 0 && dy == 0) return;
+
+    Point nextPos(point.getX() + dx, point.getY() + dy, ' ');
+
+    // 3. בדיקת חסימות סטטיות (קירות / שחקן עומד)
+    // אנחנו בודקים *לפני* שמבצעים את התזוזה (Look-Ahead)
+    if (isBlockedByStatic(nextPos.getX(), nextPos.getY(), screen, otherPlayer))
+    {
+        handleStop();
+        return;
+    }
+
+    // 4. ביצוע התזוזה הפיזית
+    point.move(dx, dy);
+
+    // 5. אינטראקציה עם אובייקטים (Collision Response)
+    // אם האינטראקציה נכשלה (למשל מכשול כבד מדי), אנחנו מבטלים את התזוזה
+    if (!handleObjectInteractions(screen, gameObjects, otherPlayer))
+    {
+        // ביטול צעד (Undo)
+        point.move(-dx, -dy);
+        handleStop();
+    }
+}
+
+
 
 /* ----------------------------------------------------
                     SPRING LAUNCH
@@ -362,12 +332,6 @@ char Player::getItemChar() const
                         LIFE SYSTEM
    ---------------------------------------------------- */
 
-void Player::decreaseLife()
-{
-    if (live > 0)
-        live--;
-}
-
 void Player::initForLevel(int x, int y, char c, ScreenId levelID)
 {
     // 1. מיקום פיזי (Physical Position)
@@ -381,6 +345,7 @@ void Player::initForLevel(int x, int y, char c, ScreenId levelID)
     springTicksLeft = 0;
     lastLoadedSpringLength = 0;
     launchDirection = Direction::STAY;
+    currentLevel = levelID;
 }
 
 void Player::resetStats()

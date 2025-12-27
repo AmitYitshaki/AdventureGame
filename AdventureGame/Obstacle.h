@@ -17,7 +17,7 @@ public:
     Obstacle(const std::vector<Point>& tiles, ScreenId screenId);
 
     // --- Drawing ---
-    void drawToBuffer(std::vector<std::string>& buffer) const;
+	void drawToBuffer(std::vector<std::string>& buffer) const override;
 
     // --- Movement & Logic ---
     bool isAtPosition(int x, int y) const override;
@@ -27,7 +27,7 @@ public:
     bool handleCollision(Player& p, const Screen& screen, const Player* otherPlayer, const std::vector<GameObject*>& gameObjects);
 
     // --- Explosion Handling ---
-    bool eraseBlockAt(int x, int y);
+    bool handleExplosionAt(int x, int y) override;
 
 private:
     std::vector<Point> parts;

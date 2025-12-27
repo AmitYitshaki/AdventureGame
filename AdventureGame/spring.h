@@ -27,7 +27,7 @@ public:
         int length);
 
     // --- Drawing ---
-    void drawToBuffer(std::vector<std::string>& buffer) const;
+	void drawToBuffer(std::vector<std::string>& buffer) const override;
 
     // --- Collision & Logic ---
     bool isAtPosition(int x, int y) const override;
@@ -36,7 +36,7 @@ public:
     // --- Explosion Handling ---
     // מוחקת חלק מהקפיץ שנפגע. 
     // מחזירה true אם הקפיץ הושמד כליל (אם הבסיס נפגע או לא נשארו חלקים)
-    bool handleExplosionAt(int x, int y);
+	bool handleExplosionAt(int x, int y) override;
 
     // --- Properties ---
     void setDirection(Direction newDir); // מעדכנת כיוון לכל החלקים הקיימים

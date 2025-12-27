@@ -2,6 +2,8 @@
 
 #include "Point.h"
 #include "ScreenID.h"
+#include <vector> 
+#include <string>
 
 // Forward declarations (avoid unnecessary includes)
 class Player;
@@ -28,7 +30,6 @@ public:
     {}
 
 
-
     virtual ~GameObject() {}
 
     // ------------------------------------------------------------
@@ -41,6 +42,8 @@ public:
 
     // Optional action trigger (for objects with an active ability)
     virtual void use() {}
+
+    virtual bool handleExplosionAt(int x, int y);
 
     // ------------------------------------------------------------
     //              INVENTORY & GAME STATE MANAGEMENT
@@ -60,6 +63,9 @@ public:
 
 	// Receive a signal from Switch object (default: do nothing)
     virtual void receiveSignal(bool state) {} 
+
+	//draw object to buffer
+    virtual void drawToBuffer(std::vector<std::string>& buffer) const;
 
     // ------------------------------------------------------------
     //                       ACCESSORS

@@ -132,7 +132,6 @@ void Game::writeHudText(std::vector<std::string>& buffer, int x, int y, const st
     }
 }
 
-
 void Game::drawObjectsToBuffer(std::vector<std::string>& buffer)
 {
     ScreenId currentId = currentScreen->getScreenId();
@@ -141,13 +140,7 @@ void Game::drawObjectsToBuffer(std::vector<std::string>& buffer)
     {
         if (!obj || obj->getScreenId() != currentId)
             continue;
-
-        if (auto spring = dynamic_cast<Spring*>(obj))
-            spring->drawToBuffer(buffer);
-        else if (auto obstacle = dynamic_cast<Obstacle*>(obj))
-            obstacle->drawToBuffer(buffer);
-        else
-            writeToBuffer(buffer, obj->getX(), obj->getY(), obj->getChar());
+		obj->drawToBuffer(buffer);
     }
 }
 
@@ -413,34 +406,47 @@ void Game::updateBombs()
 
 void Game::update()
 {
-    // --- תיקון: שימוש במהירות האמיתית של השחקן (תומך בקפיץ) ---
+    // חישוב מספר הצעדים (מהירות כפולה אם עפים)
     int steps1 = player1.isFlying() ? player1.getSpeed() : 1;
     int steps2 = player2.isFlying() ? player2.getSpeed() : 1;
 
+    // --- תזוזת שחקן 1 ---
     for (int i = 0; i < steps1; ++i) {
-        player1.move(*currentScreen, gameObjects);
+        // שולחים את player2 כדי לבדוק התנגשות איתו
+        player1.move(*currentScreen, gameObjects, &player2);
+
+        // אם נתקענו במשהו והתעופה הפסיקה, יוצאים מהלולאה
         if (!player1.isFlying()) break;
     }
+
+    // --- תזוזת שחקן 2 ---
     for (int i = 0; i < steps2; ++i) {
-        player2.move(*currentScreen, gameObjects);
+        // שולחים את player1
+        player2.move(*currentScreen, gameObjects, &player1);
+
         if (!player2.isFlying()) break;
     }
 
+    // עדכון טיימרים ואפקטים
     if (player1.isFlying()) player1.updateSpringEffect();
     if (player2.isFlying()) player2.updateSpringEffect();
 
+    // בדיקות מעבר שלב וטעינה
     if (currentScreen->getScreenId() != ScreenId::HOME &&
         currentScreen->getScreenId() != ScreenId::INSTRUCTIONS)
+    {
         checkLevelTransition();
+    }
 
     checkIsPlayerLoaded();
 
+    // ניהול חידות
     if (!RiddleMode && checkPlayerHasRiddle()) {
         if (player1.hasRiddle()) startRiddle(player1.getHeldRiddle(), player1);
         else if (player2.hasRiddle()) startRiddle(player2.getHeldRiddle(), player2);
     }
-    
-	updateBombs();
+
+    updateBombs();
 }
 
 
@@ -628,7 +634,7 @@ void Game::resetPlayersForNewLevel()
      //show message for dark rooms
     if (currentScreen->isDark())
     {
-        setStatusMessage("This room is dark... Try a torch!");
+        setStatusMessage("Dark Room, Try a torch!");
     }
     else
     {
@@ -644,17 +650,20 @@ void Game::checkLevelTransition()
     ScreenId real = currentScreen->getScreenId();
  
     if (t1 != real && t2 == real){
-        setStatusMessage("Player 1 witting in next Room!");
+        setStatusMessage("p1 change Room!");
 	    player1.updatepoint(-1, -1); //move player off-screen to avoid multiple triggers
     }
     else if (t2 != real && t1 == real){
-        setStatusMessage("Player 2 witting in next Room!");
+        setStatusMessage("p2 change Room!");
         player2.updatepoint(-1, -1); //move player off-screen to avoid multiple triggers
     }
 
     if (t1 != real && t2 != real && t1 == t2)
     {
         goToScreen(t1);
+        setStatusMessage("Level Complete! +200");
+        player1.addScore(100);
+        player2.addScore(100);
         resetPlayersForNewLevel();
     }
 }
@@ -809,7 +818,7 @@ void Game::startRiddle(Riddle* riddle, Player& p)
 
 void Game::handleRiddleInput(char key)
 {
-    if (!currentRiddle || !currentRiddlePlayer)
+    if (!currentRiddle || !getCurrentRiddlePlayer())
         return;
 
     if (key < '1' || key > '4')
@@ -823,7 +832,8 @@ void Game::handleRiddleInput(char key)
 
     if (selected == currentRiddle->getCorrectAnswer())
     {
-        setStatusMessage("Correct!");
+        setStatusMessage("Correct! +100 Points");
+		getCurrentRiddlePlayer()->addScore(100);
         p.removeHeldItem();
 
         RiddleMode = false;
@@ -929,41 +939,22 @@ void Game::explodeCell(int x, int y, Screen& screen)
     }
 
     // 3. פגיעה באובייקטים
-    for (size_t i = 0; i < gameObjects.size(); ++i)
+    for (GameObject* obj : gameObjects)
     {
-        GameObject* obj = gameObjects[i];
         if (!obj) continue;
+        if (obj->getScreenId() != screen.getScreenId()) continue;
+        if (obj->getX() < 0 || obj->getY() < 0) continue;
+        if (obj->isCollected()) continue;
 
-        // סינונים רגילים
-        if (obj->getScreenId() != curr_screen) continue;
-        if (obj->getX() < 0 || obj->getY() < 0) continue; // כבר מחוק
-        if (obj->isCollected()) continue; // בתיק
+        // הגנה: לא מפוצצים פצצות אחרות (כאן עדיין צריך cast קטן או דגל isBomb באבא)
+        // אבל זה המינימום ההכרחי.
+        if (dynamic_cast<Bomb*>(obj)) continue;
 
-        // האם האובייקט נמצא במוקד הפיצוץ?
-        if (obj->isAtPosition(x, y))
+        // === הקסם השני ===
+        // כל אובייקט יחליט בעצמו אם הוא נפגע, ואם הוא צריך להימחק
+        if (obj->handleExplosionAt(x, y))
         {
-            // לא מפוצצים פצצות אחרות (כדי למנוע שרשרת כרגע)
-            if (dynamic_cast<Bomb*>(obj)) continue;
-
-            // === טיפול במכשולים (Obstacles) ===
-            if (auto obstacle = dynamic_cast<Obstacle*>(obj))
-            {
-                if (obstacle->eraseBlockAt(x, y)) {
-                    obj->removeFromGame(); // אם התרוקן לגמרי
-                }
-            }
-            // === טיפול בקפיצים (Springs) - התוספת החדשה ===
-            else if (auto spring = dynamic_cast<Spring*>(obj))
-            {
-                if (spring->handleExplosionAt(x, y)) {
-                    obj->removeFromGame(); // אם הראש נהרס או הכל נהרס
-                }
-            }
-            // === אובייקטים רגילים ===
-            else
-            {
-                obj->removeFromGame();
-            }
+            obj->removeFromGame();
         }
     }
 }

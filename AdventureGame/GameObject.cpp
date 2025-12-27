@@ -31,6 +31,25 @@ void GameObject::setChar(char newC)
     point.setChar(newC);
 }
 
+
+// ------------------------------------------------------------
+//                        drawing
+// ------------------------------------------------------------
+
+void GameObject::drawToBuffer(std::vector<std::string>& buffer) const
+{
+    // מימוש דיפולטיבי: מצייר את התו של האובייקט במיקום שלו
+    int x = point.getX();
+    int y = point.getY();
+
+    // בדיקת גבולות בסיסית
+    if (y >= 0 && y < (int)buffer.size() &&
+        x >= 0 && x < (int)buffer[y].size())
+    {
+        buffer[y][x] = point.getChar();
+    }
+}
+
 // ------------------------------------------------------------
 //                        COLLISION
 // ------------------------------------------------------------
@@ -49,4 +68,13 @@ bool GameObject::handleCollision(Player& p, const Screen& screen)
     // Case 2: Solid → block movement
     // Derived classes (e.g., Door) override this for custom behavior.
     return false;
+}
+
+bool GameObject::handleExplosionAt(int x, int y)
+{
+    // בדיקה בסיסית: אם הפיצוץ פגע במיקום של האובייקט
+    if (isAtPosition(x, y)) {
+        return true; // האובייקט מושמד לחלוטין
+    }
+    return false; // לא נפגע
 }

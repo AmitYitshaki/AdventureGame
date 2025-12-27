@@ -49,48 +49,24 @@ public:
 
 
     // --- drawing ---
-    void draw() const
-    {
-        point.draw();
-    }
+    void draw() const{point.draw();}
 
 
     // --- direction control ---
-    void setDirection(Direction direction)
-    {
-        dir = direction;
-    }
+    void setDirection(Direction direction){dir = direction;}
 
-    void stopMovement()
-    {
-        dir = Direction::STAY;
-    }
+    void stopMovement(){dir = Direction::STAY;}
 
-    Direction getDirection() const
-    {
-        return dir;
-    }
+    Direction getDirection() const{return dir;}
 
     // --- position / char ---
-    int getX() const
-    {
-        return point.getX();
-    }
+    int getX() const{return point.getX();}
 
-    int getY() const
-    {
-        return point.getY();
-    }
+    int getY() const{return point.getY();}
 
-    char getChar() const
-    {
-        return point.getChar();
-    }
+    char getChar() const{return point.getChar();}
 
-    void updatepoint(int x, int y)
-    {
-        point.setPos(x, y);
-    }
+    void updatepoint(int x, int y){point.setPos(x, y);}
 
     // --- level info ---
     ScreenId getCurrentLevel() const { return currentLevel; }
@@ -100,12 +76,23 @@ public:
 
     // --- movement / physics ---
     void move(Screen& screen, std::vector<GameObject*>& gameObjects, const Player* otherPlayer = nullptr);
-    void moveFlying(Screen& screen, std::vector<GameObject*>& gameObjects, const Player* otherPlayer = nullptr);
     void launch(int springLen); // start spring effect based on spring length
-    int getSpeed() { return speed; }
+    int getSpeed() const { return speed; }
     bool isFlying() const { return flying; }
     void setFlying(bool canFly) { flying = canFly; }
 	int getForce() const { return force; }
+    // מחשבת את ה-dx/dy לפי המצב הנוכחי (תעופה או הליכה רגילה)
+    void calculateMovementDelta(int& dx, int& dy) const;
+
+    // בודקת האם המיקום הבא חסום פיזית (קיר או שחקן אחר עומד)
+    bool isBlockedByStatic(int x, int y, const Screen& screen, const Player* otherPlayer) const;
+
+    // מטפלת באינטראקציה עם אובייקטים (לולאת ה-GameObject)
+    // מחזירה true אם התנועה מאושרת, false אם נחסמנו
+    bool handleObjectInteractions(const Screen& screen, std::vector<GameObject*>& gameObjects, const Player* otherPlayer);
+
+    // פונקציית עזר לעצירה (מטפלת גם בתעופה וגם בהליכה)
+    void handleStop();
 
     bool isLoaded() const { return loaded; }
     void setLoaded(bool isLoaded) { loaded = isLoaded; }
@@ -141,7 +128,9 @@ public:
     Riddle* getHeldRiddle() const;
     char getItemChar() const;
     // --- life system and score ---
-    void decreaseLife();
+	void addScore(int amount) { score += amount; }
+	void addLife() { live++; }
+	void decreaseLife() { if (live > 0) live--; }
     int getLive() const { return live; }
 	void resetLives() { live = 3; }
 	int getScore() const { return score; }

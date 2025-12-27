@@ -38,6 +38,10 @@ public:
     Game();
     ~Game();
 
+	//blocking copy constructor and assignment operator to prevent "shallow copies"
+    Game(const Game&) = delete;
+    Game& operator=(const Game&) = delete;
+
     // --- Main Loop ---
     void start();
     void draw();
@@ -86,6 +90,7 @@ private:
     void writeToBuffer(std::vector<std::string>& buffer, int x, int y, char c);
     void writeTextToBuffer(std::vector<std::string>& buffer, int x, int y, const std::string& text);
     void writeHudText(std::vector<std::string>& buffer, int x, int y, const std::string& text);
+    
     void drawLegendToBuffer(std::vector<std::string>& buffer);
     void drawObjectsToBuffer(std::vector<std::string>& buffer);
     void drawPlayersToBuffer(std::vector<std::string>& buffer);
@@ -119,6 +124,7 @@ private:
     void startRiddle(Riddle* riddle, Player& p);
     void loadRiddlesFromFile(const std::string& filename);
     void assignRiddlesToLevel();
+	Player* getCurrentRiddlePlayer() const{ return currentRiddlePlayer; }
     // Navigation
     void goToScreen(ScreenId id);
 

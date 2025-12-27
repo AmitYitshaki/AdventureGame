@@ -154,7 +154,7 @@ bool Obstacle::handleCollision(Player& p, const Screen& screen, const Player* ot
 //            EXPLOSION HANDLING (התוספת)
 // =========================================================
 
-bool Obstacle::eraseBlockAt(int x, int y)
+bool Obstacle::handleExplosionAt(int x, int y)
 {
     // משתמשים ב-parts (כמו בקוד המקורי שלך)
     for (auto it = parts.begin(); it != parts.end(); ++it)
