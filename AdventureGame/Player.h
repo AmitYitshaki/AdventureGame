@@ -116,7 +116,6 @@ public:
     void startSpringEffect(int power);   // power = N (spring length)
     void updateSpringEffect();           // decrement ticks; stop at 0
     void stopSpringEffect();             // reset flying state
-    int getSpeed() const { return speed; }
 
     // --- HUD ---
     int getHudX() const { return hudX; }
