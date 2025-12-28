@@ -79,6 +79,8 @@ private:
     Player* currentRiddlePlayer = nullptr;
 
     bool debugMode = false;
+    bool exitToMainMenu = false;
+    bool pendingRestart = false;
 
     static std::string statusMessage;
 
@@ -117,8 +119,9 @@ private:
     bool checkPlayerHasRiddle();
 
     // Level transitions
-    void resetPlayersForNewLevel();
     void checkLevelTransition();
+    void gameOverScreen(const std::string& message);
+    void restartCurrentLevel();
 
     // Riddle activation
     void startRiddle(Riddle* riddle, Player& p);

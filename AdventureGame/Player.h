@@ -33,6 +33,8 @@ private:
     Direction launchDirection = Direction::STAY;
     GameObject* heldItem = nullptr;
     ScreenId currentLevel = ScreenId::ROOM1;
+    int savedLife = 3;
+    int savedScore = 0;
 
 public:
     // --- ctor & dtor ---
@@ -75,7 +77,7 @@ public:
     void resetStats();
 
     // --- movement / physics ---
-    void move(Screen& screen, std::vector<GameObject*>& gameObjects, const Player* otherPlayer = nullptr);
+    void move(Screen& screen, std::vector<GameObject*>& gameObjects,Player* otherPlayer = nullptr);
     void launch(int springLen); // start spring effect based on spring length
     int getSpeed() const { return speed; }
     bool isFlying() const { return flying; }
@@ -85,11 +87,11 @@ public:
     void calculateMovementDelta(int& dx, int& dy) const;
 
     // בודקת האם המיקום הבא חסום פיזית (קיר או שחקן אחר עומד)
-    bool isBlockedByStatic(int x, int y, const Screen& screen, const Player* otherPlayer) const;
+    bool isBlockedByStatic(int x, int y, const Screen& screen,Player* otherPlayer) const;
 
     // מטפלת באינטראקציה עם אובייקטים (לולאת ה-GameObject)
     // מחזירה true אם התנועה מאושרת, false אם נחסמנו
-    bool handleObjectInteractions(const Screen& screen, std::vector<GameObject*>& gameObjects, const Player* otherPlayer);
+    bool handleObjectInteractions(const Screen& screen, std::vector<GameObject*>& gameObjects,Player* otherPlayer);
 
     // פונקציית עזר לעצירה (מטפלת גם בתעופה וגם בהליכה)
     void handleStop();
@@ -139,4 +141,18 @@ public:
     // --- spring stored data ---
     int getLoadedSpringLen() const { return lastLoadedSpringLength; }
     void setLoadedSpringLen(int len) { lastLoadedSpringLength = len; }
+
+    void saveState() {
+        savedLife = live;
+        savedScore = score;
+    }
+    void restoreState() {
+        live = savedLife;
+        score = savedScore;
+        heldItem = nullptr;
+
+        // אופציונלי: איפוס דגלים נוספים כדי למנוע באגים ויזואליים
+        flying = false;
+        loaded = false;
+    }
 };

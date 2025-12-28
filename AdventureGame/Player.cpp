@@ -91,19 +91,19 @@ void Player::calculateMovementDelta(int& dx, int& dy) const
     }
 }
 
-bool Player::isBlockedByStatic(int x, int y, const Screen& screen, const Player* otherPlayer) const
+bool Player::isBlockedByStatic(int x, int y, const Screen& screen, Player* otherPlayer) const
 {
     // 1. בדיקת קירות
     if (screen.isWall(Point(x, y, ' '))) {
         return true;
     }
 
-    // 2. בדיקת שחקן אחר (רק אם הוא קיים ונמצא ב-STAY)
+    // 2. בדיקת שחקן אחר - התיקון לבעיה הקטנה!
+    // הסרנו את הבדיקה (dir == STAY).
+    // לא משנה לאן הוא זז, אם הוא כרגע במשבצת היעד - זה חסום.
     if (otherPlayer)
     {
-        if (otherPlayer->getX() == x &&
-            otherPlayer->getY() == y &&
-            otherPlayer->getDirection() == Direction::STAY)
+        if (otherPlayer->getX() == x && otherPlayer->getY() == y)
         {
             return true;
         }
@@ -112,7 +112,7 @@ bool Player::isBlockedByStatic(int x, int y, const Screen& screen, const Player*
     return false;
 }
 
-bool Player::handleObjectInteractions(const Screen& screen, std::vector<GameObject*>& gameObjects, const Player* otherPlayer)
+bool Player::handleObjectInteractions(const Screen& screen, std::vector<GameObject*>& gameObjects, Player* otherPlayer)
 {
     ScreenId currentScreenId = screen.getScreenId();
     int px = point.getX();
@@ -156,38 +156,73 @@ void Player::handleStop()
     }
 }
 
-void Player::move(Screen& screen, std::vector<GameObject*>& gameObjects, const Player* otherPlayer)
+void Player::move(Screen& screen, std::vector<GameObject*>& gameObjects, Player* otherPlayer)
 {
     // 1. בדיקות מקדימות
     if (point.getX() == -1 || isLoaded()) return;
 
     // 2. חישוב לאן רוצים לזוז
     int dx = 0, dy = 0;
-    calculateMovementDelta(dx, dy);
+    calculateMovementDelta(dx, dy); // עכשיו זו הפונקציה היחידה שמחשבת תנועה
 
-    // אם אין תזוזה, אין מה להמשיך
     if (dx == 0 && dy == 0) return;
 
     Point nextPos(point.getX() + dx, point.getY() + dy, ' ');
 
-    // 3. בדיקת חסימות סטטיות (קירות / שחקן עומד)
-    // אנחנו בודקים *לפני* שמבצעים את התזוזה (Look-Ahead)
+    // 3. בדיקת חסימות סטטיות (קירות או שחקנים)
     if (isBlockedByStatic(nextPos.getX(), nextPos.getY(), screen, otherPlayer))
     {
-        handleStop();
-        return;
+        // === התיקון לבעיה הגדולה: התנגשות בתעופה ===
+
+        // האם החסימה היא בגלל שחקן אחר?
+        if (otherPlayer && otherPlayer->getX() == nextPos.getX() && otherPlayer->getY() == nextPos.getY())
+        {
+            // האם אני כרגע עף? (כמו רכב דוהר)
+            if (isFlying())
+            {
+                // 1. העברת האנרגיה לשחקן הנפגע
+                // הוא יעוף באותו כיוון שאני עפתי אליו
+                otherPlayer->setLaunchDirection(this->dir);
+
+                // הוא מקבל את המהירות/כוח שלי (תלוי איך מימשת, נניח לפי speed)
+                otherPlayer->startSpringEffect(this->speed);
+
+                // 2. השחקן הפוגע (אני) נעצר במקום (כמו רכב שנכנס בקיר)
+                this->stopSpringEffect();
+
+                // הודעה נחמדה
+                Game::setStatusMessage("CRASH! Momentum transferred!");
+            }
+            else
+            {
+                // אם סתם הלכנו ונתקענו בו - סתם עוצרים
+                handleStop();
+            }
+        }
+        else
+        {
+            // חסימה רגילה (קיר)
+            handleStop();
+        }
+
+        return; // בכל מקרה לא נכנסים למשבצת התפוסה
     }
 
     // 4. ביצוע התזוזה הפיזית
     point.move(dx, dy);
 
-    // 5. אינטראקציה עם אובייקטים (Collision Response)
-    // אם האינטראקציה נכשלה (למשל מכשול כבד מדי), אנחנו מבטלים את התזוזה
+    // 5. אינטראקציה עם אובייקטים
     if (!handleObjectInteractions(screen, gameObjects, otherPlayer))
     {
         // ביטול צעד (Undo)
         point.move(-dx, -dy);
-        handleStop();
+
+        if (isFlying()) {
+            stopSpringEffect(); // התרסקות לתוך מכשול
+        }
+        else {
+            // הליכה רגילה שנתקעה - לא עוצרים כיוון כדי לאפשר דחיפה משותפת
+        }
     }
 }
 
@@ -348,13 +383,11 @@ void Player::initForLevel(int x, int y, char c, ScreenId levelID)
     currentLevel = levelID;
 }
 
-void Player::resetStats()
-{
+void Player::resetStats() {
     score = 0;
     live = 3;
-    heldItem = nullptr; // במשחק חדש מתחילים בלי כלום
+    heldItem = nullptr;
+    savedLife = 3;
+    savedScore = 0;
 }
-
-
-
 

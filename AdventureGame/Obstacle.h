@@ -3,6 +3,7 @@
 #include "GameObject.h"
 #include "Point.h"
 #include "Direction.h" // <--- הוספתי את זה! בלעדיו הוא לא מכיר את Direction
+#include "Laser.h"
 #include <vector>
 #include <string>
 

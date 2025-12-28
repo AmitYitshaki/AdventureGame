@@ -378,27 +378,25 @@ void Game::updateBombs()
 
     for (auto obj : gameObjects)
     {
+        // בדיקת יציאת חירום - אם המשתמש ביקש ריסטארט, עוצרים מיד!
+        if (pendingRestart || exitToMainMenu) return;
+
         auto bomb = dynamic_cast<Bomb*>(obj);
-        // מסננים: רק פצצות, רק במסך הנוכחי
         if (!bomb) continue;
         if (bomb->getScreenId() != curr_screen) continue;
 
-        // קידום הטיימר
         if (bomb->tick())
         {
-            // --- הפצצה התפוצצה! ---
+            // ... (קוד הפיצוץ שלך) ...
             Point c = bomb->getPoint();
             int radius = Bomb::getExplosionRadius();
-
-            // 1. אפקט ויזואלי (Hit Freeze)
             visualizeExplosion(c.getX(), c.getY(), radius);
-
-            // 2. חישוב נזק והרס סביבתי
             applyBombEffects(c.getX(), c.getY(), *currentScreen, radius);
 
-            // 3. מחיקת הפצצה מהמשחק
-            bomb->removeFromGame();
+            // בדיקה נוספת אחרי הפיצוץ (למקרה שהתפוצץ מפתח וביקשנו ריסטארט)
+            if (pendingRestart || exitToMainMenu) return;
 
+            bomb->removeFromGame();
             setStatusMessage("BOOM!");
         }
     }
@@ -406,32 +404,27 @@ void Game::updateBombs()
 
 void Game::update()
 {
-    // חישוב מספר הצעדים (מהירות כפולה אם עפים)
+    // חישוב צעדים (תעופה/הליכה)
     int steps1 = player1.isFlying() ? player1.getSpeed() : 1;
     int steps2 = player2.isFlying() ? player2.getSpeed() : 1;
 
-    // --- תזוזת שחקן 1 ---
+    // תזוזת שחקן 1
     for (int i = 0; i < steps1; ++i) {
-        // שולחים את player2 כדי לבדוק התנגשות איתו
         player1.move(*currentScreen, gameObjects, &player2);
-
-        // אם נתקענו במשהו והתעופה הפסיקה, יוצאים מהלולאה
         if (!player1.isFlying()) break;
     }
 
-    // --- תזוזת שחקן 2 ---
+    // תזוזת שחקן 2
     for (int i = 0; i < steps2; ++i) {
-        // שולחים את player1
         player2.move(*currentScreen, gameObjects, &player1);
-
         if (!player2.isFlying()) break;
     }
 
-    // עדכון טיימרים ואפקטים
+    // עדכון קפיצים
     if (player1.isFlying()) player1.updateSpringEffect();
     if (player2.isFlying()) player2.updateSpringEffect();
 
-    // בדיקות מעבר שלב וטעינה
+    // בדיקת מעבר שלב
     if (currentScreen->getScreenId() != ScreenId::HOME &&
         currentScreen->getScreenId() != ScreenId::INSTRUCTIONS)
     {
@@ -440,13 +433,37 @@ void Game::update()
 
     checkIsPlayerLoaded();
 
-    // ניהול חידות
+    // חידות
     if (!RiddleMode && checkPlayerHasRiddle()) {
         if (player1.hasRiddle()) startRiddle(player1.getHeldRiddle(), player1);
         else if (player2.hasRiddle()) startRiddle(player2.getHeldRiddle(), player2);
     }
 
+    // פצצות (זה המקום שבו explodeCell נקראת ויכולה להפעיל Game Over על מפתח/דלת)
     updateBombs();
+
+    if (!pendingRestart && !exitToMainMenu) { // רק אם עוד לא נקבע גורלנו
+        if (player1.getLive() <= 0) gameOverScreen("Player 1 ran out of lives!");
+        else if (player2.getLive() <= 0) gameOverScreen("Player 2 ran out of lives!");
+    }
+
+    // === הביצוע הבטוח בסוף הסיבוב ===
+
+    if (pendingRestart)
+    {
+        pendingRestart = false; // מורידים את הדגל
+        restartCurrentLevel();  // מבצעים את הריסטארט בבטחה
+        return;
+    }
+
+    if (exitToMainMenu)
+    {
+        exitToMainMenu = false;
+        player1.stopMovement();
+        player2.stopMovement();
+        resetGame(); // או goToScreen(HOME)
+        return;
+    }
 }
 
 
@@ -619,30 +636,6 @@ void Game::applyLighting(std::vector<std::string>& buffer)
                     LEVEL TRANSITION SYSTEM
    ============================================================ */
 
-void Game::resetPlayersForNewLevel()
-{
-    player1.updatepoint(2, 12);
-    player2.updatepoint(3, 12);
-
-    player1.setDirection(Direction::STAY);
-    player2.setDirection(Direction::STAY);
-
-    ScreenId currentId = currentScreen->getScreenId();
-    player1.setCurrentLevel(currentId);
-    player2.setCurrentLevel(currentId);
-
-     //show message for dark rooms
-    if (currentScreen->isDark())
-    {
-        setStatusMessage("Dark Room, Try a torch!");
-    }
-    else
-    {
-        setStatusMessage("");
-    }
-}
-
-
 void Game::checkLevelTransition()
 {
     ScreenId t1 = player1.getCurrentLevel();
@@ -660,11 +653,12 @@ void Game::checkLevelTransition()
 
     if (t1 != real && t2 != real && t1 == t2)
     {
-        goToScreen(t1);
         setStatusMessage("Level Complete! +200");
         player1.addScore(100);
         player2.addScore(100);
-        resetPlayersForNewLevel();
+        player1.saveState();
+        player2.saveState();
+        goToScreen(t1);
     }
 }
 
@@ -722,6 +716,99 @@ void Game::goToScreen(ScreenId id)
     setStatusMessage("");
     if (currentScreen->isDark()) setStatusMessage("Dark Room,Try Torch!");
     assignRiddlesToLevel();
+}
+
+void Game::restartCurrentLevel()
+{
+    ScreenId currentId = currentScreen->getScreenId();
+
+    // 1. ניקוי אובייקטים קיימים
+    for (auto obj : gameObjects) delete obj;
+    gameObjects.clear();
+
+    // 2. שחזור המצב המדויק מתחילת השלב (חיים וניקוד)
+    player1.restoreState();
+    player2.restoreState();
+
+    // 3. טעינת המפה מחדש (כדי להחזיר מפתחות/דלתות שנהרסו)
+    std::string filename;
+    switch (currentId) {
+    case ScreenId::ROOM1: filename = "Room1Screen.txt"; break;
+    case ScreenId::ROOM2: filename = "Room2Screen.txt"; break;
+    case ScreenId::ROOM3: filename = "Room3Screen.txt"; break;
+    default: filename = "Room1Screen.txt"; break;
+    }
+
+    // יצירה מחדש של אובייקט המסך בזיכרון
+    screens[(int)currentId] = Screen(currentId);
+    LevelLoader::loadLevelFromFile(filename, screens[(int)currentId], gameObjects);
+
+    RiddleMode = false;
+    currentRiddle = nullptr;
+    currentRiddlePlayer = nullptr;
+    setStatusMessage("");
+
+    // 4. חזרה למשחק ומיקום השחקנים מחדש
+    goToScreen(currentId);
+
+    // החזרת החידות אם צריך
+    assignRiddlesToLevel();
+}
+
+void Game::gameOverScreen(const std::string& message)
+{
+    // ניקוי מסך כדי לתת פוקוס להודעה
+    system("cls");
+
+    // חישוב מרכז המסך (בהנחה שרוחב המסך הוא 80)
+    const int BOX_WIDTH = 50;
+    const int BOX_HEIGHT = 9;
+    int x = (Screen::WIDTH - BOX_WIDTH) / 2;
+    int y = (Screen::HEIGHT - BOX_HEIGHT) / 2;
+
+    // פונקציית עזר קטנה לציור (אפשר גם ידנית עם gotoxy)
+    auto printCentered = [&](int rowOffset, const std::string& text) {
+        int padding = (BOX_WIDTH - 2 - (int)text.length()) / 2;
+        gotoxy(x, y + rowOffset);
+        std::cout << "#" << std::string(padding, ' ') << text << std::string(BOX_WIDTH - 2 - padding - text.length(), ' ') << "#";
+        };
+
+    // --- ציור המסגרת ---
+    gotoxy(x, y);     std::cout << std::string(BOX_WIDTH, '#'); // גג
+    for (int i = 1; i < BOX_HEIGHT - 1; ++i) {
+        gotoxy(x, y + i); std::cout << "#" << std::string(BOX_WIDTH - 2, ' ') << "#"; // דפנות
+    }
+    gotoxy(x, y + BOX_HEIGHT - 1); std::cout << std::string(BOX_WIDTH, '#'); // רצפה
+
+    // --- תוכן ההודעה ---
+    printCentered(2, "GAME OVER");
+    printCentered(4, message); // סיבת המוות (למשל: "Player 1 Died")
+
+    // --- האופציות ---
+    printCentered(6, "[R] Restart Level    [H] Main Menu");
+
+    // --- לולאת המתנה לקלט ---
+    while (true)
+    {
+        if (_kbhit())
+        {
+            char key = _getch();
+
+            // אופציה 1: נסה שוב את השלב הנוכחי
+            if (key == 'R' || key == 'r')
+            {
+                pendingRestart = true;
+                return;
+            }
+
+            // אופציה 2: חזרה לתפריט הראשי
+            else if (key == 'H' || key == 'h')
+            {
+                exitToMainMenu = true;
+                return;
+            }
+        }
+    }
 }
 
 /* ============================================================
@@ -913,8 +1000,6 @@ void Game::applyBombEffects(int cx, int cy, Screen& curr_screen, int R)
 
 void Game::explodeCell(int x, int y, Screen& screen)
 {
-    ScreenId curr_screen = screen.getScreenId();
-
     // 1. פגיעה בשחקנים
     if (player1.getX() == x && player1.getY() == y) player1.decreaseLife();
     if (player2.getX() == x && player2.getY() == y) player2.decreaseLife();
@@ -925,7 +1010,6 @@ void Game::explodeCell(int x, int y, Screen& screen)
 
     if (screen.hasLegendDefined()) {
         Point lPos = screen.getLegendStart();
-        // בדיקת חפיפה עם אזור המקרא (רוחב קבוע 75, גובה 3 שורות)
         if (x >= lPos.getX() && x < lPos.getX() + Screen::LEGEND_WIDTH &&
             y >= lPos.getY() && y <= lPos.getY() + 2) {
             isLegendArea = true;
@@ -938,23 +1022,42 @@ void Game::explodeCell(int x, int y, Screen& screen)
         }
     }
 
-    // 3. פגיעה באובייקטים
-    for (GameObject* obj : gameObjects)
+    // 3. פגיעה באובייקטים - ותפיסת מצבי GAME OVER
+    // אנו עוברים על המערך. שימו לב: אם מופעל Game Over, אנחנו יוצאים מיד מהפונקציה.
+    for (auto obj : gameObjects)
     {
         if (!obj) continue;
         if (obj->getScreenId() != screen.getScreenId()) continue;
-        if (obj->getX() < 0 || obj->getY() < 0) continue;
-        if (obj->isCollected()) continue;
+        if (obj->getX() < 0 || obj->getY() < 0) continue; // כבר מחוק
+        if (obj->isCollected()) continue; // כבר נאסף
 
-        // הגנה: לא מפוצצים פצצות אחרות (כאן עדיין צריך cast קטן או דגל isBomb באבא)
-        // אבל זה המינימום ההכרחי.
-        if (dynamic_cast<Bomb*>(obj)) continue;
-
-        // === הקסם השני ===
-        // כל אובייקט יחליט בעצמו אם הוא נפגע, ואם הוא צריך להימחק
-        if (obj->handleExplosionAt(x, y))
+        // האם הפיצוץ פוגע באובייקט הזה?
+        if (obj->isAtPosition(x, y))
         {
-            obj->removeFromGame();
+            // --- בדיקה קריטית 1: מפתח ---
+            if (auto key = dynamic_cast<Key*>(obj))
+            {
+                // אם פוצצנו מפתח שלא נאסף -> הפסדנו
+                gameOverScreen("Mission Failed: Key Destroyed!");
+                return; // יוצאים מיד כדי לא להמשיך בלוגיקה על משחק שנגמר
+            }
+
+            // --- בדיקה קריטית 2: דלת ---
+            if (auto door = dynamic_cast<Door*>(obj))
+            {
+                // אם פוצצנו דלת -> הפסדנו (כי שברנו את המעבר)
+                gameOverScreen("Mission Failed: Door Destroyed!");
+                return;
+            }
+
+            // הגנה: לא מפוצצים פצצות אחרות כדי למנוע לולאה אינסופית כרגע
+            if (dynamic_cast<Bomb*>(obj)) continue;
+
+            // --- טיפול רגיל: פיצוץ אויבים/מכשולים ---
+            if (obj->handleExplosionAt(x, y))
+            {
+                obj->removeFromGame();
+            }
         }
     }
 }

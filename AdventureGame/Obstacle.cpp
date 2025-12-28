@@ -65,12 +65,15 @@ bool Obstacle::canMove(int dx, int dy, const Screen& screen, const std::vector<G
         int nx = part.getX() + dx;
         int ny = part.getY() + dy;
 
+        // בדיקת גבולות מסך
         if (nx < 0 || nx >= Screen::WIDTH || ny < 0 || ny >= Screen::HEIGHT)
             return false;
 
+        // בדיקת קירות
         if (screen.isWall(Point(nx, ny, ' ')))
             return false;
 
+        // בדיקת אובייקטים
         for (const auto obj : gameObjects)
         {
             if (!obj || obj->isCollected())
@@ -79,8 +82,25 @@ bool Obstacle::canMove(int dx, int dy, const Screen& screen, const std::vector<G
             if (obj->getScreenId() != screen.getScreenId())
                 continue;
 
-            if (obj != this && obj->isSolid() && obj->isAtPosition(nx, ny))
-                return false;
+            // אם האובייקט נמצא במשבצת שאליה אנחנו מנסים להגיע
+            if (obj != this && obj->isAtPosition(nx, ny))
+            {
+                // === התיקון כאן ===
+                // בדיקה האם זה לייזר והאם הוא כבוי (מסומן כרווח)
+                if (auto laser = dynamic_cast<Laser*>(obj))
+                {
+                    // אם הלייזר "בלתי נראה" (רווח), המכשול יכול לעבור דרכו!
+                    if (laser->getChar() == ' ')
+                    {
+                        continue; // מדלגים לסיבוב הבא בלולאה (מתעלמים מהחסימה)
+                    }
+                }
+                // ==================
+
+                // אם זה לא לייזר כבוי, בודקים אם הוא מוצק רגיל
+                if (obj->isSolid())
+                    return false;
+            }
         }
     }
     return true;
