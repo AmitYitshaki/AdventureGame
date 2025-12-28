@@ -8,6 +8,7 @@
 #include <chrono>    // std::chrono
 #include <fstream>
 #include <sstream>
+#include <windows.h>
 
 // Project includes
 #include "Player.h"
@@ -81,6 +82,8 @@ private:
     bool debugMode = false;
     bool exitToMainMenu = false;
     bool pendingRestart = false;
+    bool colorEnabled = true;
+    bool soundEnabled = true;
 
     static std::string statusMessage;
 
@@ -139,4 +142,16 @@ private:
 
     void updateBombs();
     void applyBombEffects(int cx, int cy, Screen& curr_screen, int R);
+
+    void toggleColor() { colorEnabled = !colorEnabled; }
+    void toggleSound() { soundEnabled = !soundEnabled; }
+    bool isColorEnabled() const { return colorEnabled; }
+    bool isSoundEnabled() const { return soundEnabled; }
+
+    void setConsoleColor(int colorCode);
+    int getColorForChar(char c);
+    void playSound(int frequency, int duration);
+    void drawHomeMessage(std::vector<std::string>& buffer);
+    void applyColor(char c, int y);
+    int resolveColor(char c, int x, int y);
 };

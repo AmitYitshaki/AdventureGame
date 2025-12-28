@@ -310,8 +310,35 @@ void Game::drawRiddle(std::vector<std::string>& buffer)
 void Game::renderBuffer(const std::vector<std::string>& buffer)
 {
     gotoxy(0, 0);
-    for (const auto& line : buffer)
-        std::cout << line << '\n';
+
+    // משתנה שזוכר מה הצבע האחרון שביקשנו מהמערכת
+    // מתחילים מ-1- (ערך לא הגיוני) כדי לכפות שינוי בתו הראשון
+    int lastColor = -1;
+
+    for (int y = 0; y < (int)buffer.size(); ++y)
+    {
+        const std::string& line = buffer[y];
+        for (int x = 0; x < (int)line.length(); ++x)
+        {
+            char c = line[x];
+
+            // 1. חישוב הצבע הנדרש (פעולה מתמטית מהירה)
+            int requiredColor = resolveColor(c, x, y);
+
+            // 2. רק אם הצבע הנדרש שונה ממה שיש כרגע בפועל - קוראים למערכת ההפעלה
+            if (requiredColor != lastColor)
+            {
+                setConsoleColor(requiredColor); // הפקודה הכבדה
+                lastColor = requiredColor;      // מעדכנים את הזיכרון שלנו
+            }
+
+            std::cout << c;
+        }
+        std::cout << '\n';
+    }
+
+    // איפוס צבע בסוף ללבן
+    if (lastColor != 7) setConsoleColor(7);
 
     std::cout.flush();
 }
@@ -352,11 +379,14 @@ void Game::drawDebugDashboard()
 void Game::draw()
 {
     auto buffer = initBuffer();
-    
+
+    // כל פונקציה אחראית לבדוק אם היא רלוונטית למסך הנוכחי
     drawObjectsToBuffer(buffer);
     drawPlayersToBuffer(buffer);
     applyLighting(buffer);
     drawLegendToBuffer(buffer);
+
+    drawHomeMessage(buffer); // <--- השורה החדשה והנקייה
 
     if (RiddleMode && currentRiddle)
         drawRiddle(buffer);
@@ -367,6 +397,22 @@ void Game::draw()
         drawDebugDashboard();
 }
 
+void Game::drawHomeMessage(std::vector<std::string>& buffer)
+{
+    // אם זה לא מסך הבית - אין מה לעשות פה
+    if (currentScreen->getScreenId() != ScreenId::HOME) return;
+
+    // אם אין הודעה להציג - יוצאים
+    if (statusMessage.empty()) return;
+
+    // חישוב המיקום (ממורכז, שורה 22)
+    int msgLen = (int)statusMessage.length();
+    int x = (Screen::WIDTH - msgLen) / 2;
+    int y = 22;
+
+    // ציור ההודעה
+    drawStatusMessageAt(buffer, x, y, msgLen + 5);
+}
 /* ============================================================
                           UPDATE
    ============================================================ */
@@ -387,6 +433,7 @@ void Game::updateBombs()
 
         if (bomb->tick())
         {
+            playSound(150, 150);
             // ... (קוד הפיצוץ שלך) ...
             Point c = bomb->getPoint();
             int radius = Bomb::getExplosionRadius();
@@ -478,7 +525,7 @@ void Game::handleInput()
 
     char key = _getch();
 
-    if (key == '9'){
+    if (key == '9') {
         setDebugMode(!isDebugMode());
         return;
     }
@@ -490,14 +537,36 @@ void Game::handleInput()
         return;
     }
 
-    // Main Menu input
+    // ============================================================
+    //                  MAIN MENU INPUT (HOME)
+    // ============================================================
     if (currentScreen == &screens[(int)ScreenId::HOME])
     {
         if (key == '1') { resetGame(); }
         if (key == '2') { goToScreen(ScreenId::INSTRUCTIONS); return; }
         if (key == '3') { end(); return; }
+
+        // --- Toggle Color ---
+        if (key == 'c' || key == 'C') {
+            toggleColor();
+            setStatusMessage(isColorEnabled() ? "Color Mode: ON" : "Color Mode: OFF");
+            draw(); // Force redraw to see changes immediately
+            return;
+        }
+
+        // --- Toggle Sound ---
+        if (key == 's' || key == 'S') {
+            toggleSound();
+            setStatusMessage(isSoundEnabled() ? "Sound Mode: ON" : "Sound Mode: OFF");
+            // משמיעים צפצוף קטן לאישור אם הסאונד הופעל
+            if (isSoundEnabled()) playSound(400, 100);
+            return;
+        }
     }
-    //end screen (ROOM3) menu handlig
+
+    // ============================================================
+    //                  END GAME MENU (ROOM3)
+    // ============================================================
     if (currentScreen == &screens[(int)ScreenId::ROOM3]) {
         if (key == '1') {           // Play Again (New Game)
             resetGame();
@@ -509,7 +578,6 @@ void Game::handleInput()
         else if (key == '3') {      // Quit Game
             end();
         }
-        // Ignore any other keys in ROOM3
         return;
     }
 
@@ -528,15 +596,17 @@ void Game::handleInput()
         return;
     }
 
-    // Spring launching (STAY)
+    // Spring launching
     if (player1.isLoaded() && (key == 's' || key == 'S'))
     {
+        playSound(600, 50);
         player1.launch(player1.getLoadedSpringLen());
         setStatusMessage("");
         return;
     }
     if (player2.isLoaded() && (key == 'k' || key == 'K'))
     {
+        playSound(600, 50);
         player2.launch(player2.getLoadedSpringLen());
         setStatusMessage("");
         return;
@@ -757,6 +827,8 @@ void Game::restartCurrentLevel()
 
 void Game::gameOverScreen(const std::string& message)
 {
+
+    playSound(100, 400);
     // ניקוי מסך כדי לתת פוקוס להודעה
     system("cls");
 
@@ -1070,22 +1142,134 @@ void Game::visualizeExplosion(int cx, int cy, int radius)
     {
         for (int x = cx - radius; x <= cx + radius; ++x)
         {
-            // בדיקת גבולות מסך (כדי לא לצייר מחוץ לקונסול)
             if (x >= 0 && x < Screen::WIDTH && y >= 0 && y < Screen::HEIGHT)
             {
-                // ציור כוכבית ישירות למסך
                 gotoxy(x, y);
+
+                // === התיקון: הפעלת צבע ידנית ===
+                if (colorEnabled) setConsoleColor(14); // 14 = צהוב
                 std::cout << "+";
-                // אפשר להוסיף צבעים כאן אם תרצו בעתיד
+                if (colorEnabled) setConsoleColor(7);  // החזרה ללבן
+                // ==============================
             }
         }
     }
 
-    // החזרת הסמן למקום ניטרלי
     gotoxy(0, 0);
-
-    // הקפאה רגעית ("Hit Freeze") להעצמת האפקט
     Sleep(150);
+}
+
+void Game::playSound(int frequency, int duration)
+{
+    if (!soundEnabled) return; // מכבד את הבקשה לשקט
+
+    // Beep היא פונקציה חוסמת (עוצרת את המשחק). 
+    // לכן נשתמש במשכים קצרים מאוד (למשל 50ms) כדי לא לתקוע את המשחקיות.
+    // אופציה למתקדמים: להריץ בת'רד נפרד, אבל לקורס הזה זה לרוב Overkill.
+    Beep(frequency, duration);
+}
+
+void Game::setConsoleColor(int colorCode)
+{
+    static HANDLE hConsole = GetStdHandle(STD_OUTPUT_HANDLE);
+    SetConsoleTextAttribute(hConsole, colorCode);
+}
+
+int Game::getColorForChar(char c)
+{
+    switch (c)
+    {
+    case '#': return 8;  // קירות - אפור
+    case '@': return 12; // פצצה - אדום בוהק
+    case '+': return 14; // פיצוץ ויזואלי - צהוב
+    case '$': return 11; // שחקן 1 - תכלת
+    case '&': return 13; // שחקן 2 - ורוד/מגנטה
+    case '*': return 2;  // מכשול - ירוק
+    case 'K': return 14; // מפתח - צהוב
+    case '!': return 12; // לפיד - אדום
+    case '-': case '|': return 4; // לייזר - אדום כהה
+    case '/': case '\\':return 3;  // מתג - כחול ירקרק
+    case '?': return 9;  // חידה - כחול
+
+        // === התיקונים החדשים ===
+    case 'W': case 'w': return 10; // קפיץ (ראש וזנב) - ירוק בהיר
+    case 'D': return 6;  // דלת (אם מצוירת כ-D)
+    case '0': case '1': case '2': case '3': case '4': // דלתות וספירה לאחור
+    case '5': case '6': case '7': case '8': case '9':
+        return 6; // חום/כתום (או צבע אחר שתבחר לדלתות)
+
+    default: return 7;   // שאר הדברים - לבן
+    }
+}
+
+void Game::applyColor(char c, int y)
+{
+    // אם המשתמש כיבה צבעים - לא עושים כלום
+    if (!colorEnabled) return;
+
+    // 1. בדיקת מסכי תפריט (גישה ישירה למשתני המחלקה)
+    bool isMenu = (currentScreen->getScreenId() == ScreenId::HOME ||
+        currentScreen->getScreenId() == ScreenId::INSTRUCTIONS);
+
+    // 2. בדיקת חידה פעילה
+    bool isRiddleActive = (RiddleMode && currentRiddle != nullptr);
+
+    if (isMenu || isRiddleActive)
+    {
+        setConsoleColor(7); // לבן נקי
+        return;
+    }
+
+    // 3. בדיקת Legend (דינאמית לפי השורה y)
+    if (currentScreen->hasLegendDefined())
+    {
+        int legendStart = currentScreen->getLegendStart().getY();
+        // אם השורה הנוכחית נמצאת בטווח ה-3 שורות של הלג'נד
+        if (y >= legendStart && y < legendStart + 3)
+        {
+            setConsoleColor(7); // לבן נקי
+            return;
+        }
+    }
+
+    // 4. ברירת מחדל: צבעי משחק
+    setConsoleColor(getColorForChar(c));
+}
+
+int Game::resolveColor(char c, int x, int y)
+{
+    // אם צבעים כבויים -> החזר לבן
+    if (!colorEnabled) return 7;
+
+    // 1. בדיקת מסכי תפריט
+    bool isMenu = (currentScreen->getScreenId() == ScreenId::HOME ||
+        currentScreen->getScreenId() == ScreenId::INSTRUCTIONS);
+
+    // 2. בדיקת חידה פעילה
+    bool isRiddleActive = (RiddleMode && currentRiddle != nullptr);
+
+    if (isMenu || isRiddleActive)
+    {
+        return 7; // לבן נקי
+    }
+
+    // 3. בדיקת Legend (התיקון: בדיקת X ו-Y)
+    if (currentScreen->hasLegendDefined())
+    {
+        Point legendPos = currentScreen->getLegendStart();
+        int ly = legendPos.getY();
+        int lx = legendPos.getX();
+
+        // אנו מניחים רוחב מקסימלי של 75 ללג'נד.
+        // אם ה-X וה-Y נופלים בתוך הריבוע הזה -> זה לג'נד -> לבן.
+        if (y >= ly && y <= ly + 2 && x >= lx && x < lx + 75)
+        {
+            return 7; // לבן נקי
+        }
+    }
+
+    // 4. אחרת: צבעי משחק רגילים
+    return getColorForChar(c);
 }
 
 /* ============================================================

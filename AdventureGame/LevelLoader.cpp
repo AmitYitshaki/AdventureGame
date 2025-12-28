@@ -17,20 +17,21 @@
 #include <utility>
 
 // =========================================================
-//            Helper Functions (Private)
+//             Helper Functions (Private)
 // =========================================================
 
-GameObject* LevelLoader::findObjectAt(int x, int y, const std::vector<GameObject*>& gameObjects)
+// הפונקציה המתוקנת שבודקת גם מיקום וגם ID של המסך
+GameObject* LevelLoader::findObjectAt(int x, int y, ScreenId screenId, const std::vector<GameObject*>& gameObjects)
 {
     for (GameObject* obj : gameObjects) {
-        if (obj->isAtPosition(x, y)) return obj;
+        if (obj->isAtPosition(x, y) && obj->getScreenId() == screenId) return obj;
     }
     return nullptr;
 }
 
 // --- פונקציות הלייזר החסרות (הוספתי אותן כאן) ---
 
-void LevelLoader::scanDirection(int startX, int startY, int dx, int dy, char type,
+void LevelLoader::scanDirection(int startX, int startY, int dx, int dy, char type, ScreenId screenId,
     const std::vector<GameObject*>& allObjects,
     std::vector<GameObject*>& outputBeam)
 {
@@ -39,7 +40,8 @@ void LevelLoader::scanDirection(int startX, int startY, int dx, int dy, char typ
 
     while (true)
     {
-        GameObject* obj = findObjectAt(currX, currY, allObjects);
+        // מעבירים את ה-screenId לחיפוש
+        GameObject* obj = findObjectAt(currX, currY, screenId, allObjects);
 
         // אם אין אובייקט, עוצרים
         if (!obj) break;
@@ -71,23 +73,18 @@ std::vector<GameObject*> LevelLoader::collectLaserBeam(Laser* startNode, const s
     int startY = startNode->getY();
     char type = startNode->getChar();
 
+    // שולפים את ה-ID מהלייזר הראשון כדי להעביר לסריקה
+    ScreenId sid = startNode->getScreenId();
+
     if (type == '-')
     {
-        scanDirection(startX, startY, -1, 0, '-', allObjects, beam); // שמאלה
-        scanDirection(startX, startY, 1, 0, '-', allObjects, beam);  // ימינה
+        scanDirection(startX, startY, -1, 0, '-', sid, allObjects, beam); // שמאלה
+        scanDirection(startX, startY, 1, 0, '-', sid, allObjects, beam);  // ימינה
     }
     else if (type == '|')
     {
-        scanDirection(startX, startY, 0, -1, '|', allObjects, beam); // למעלה
-        scanDirection(startX, startY, 0, 1, '|', allObjects, beam);  // למטה
-	}
-    if (type == '-') {
-        scanDirection(startX, startY, -1, 0, '-', allObjects, beam);
-        scanDirection(startX, startY, 1, 0, '-', allObjects, beam);
-    }                                                     
-    else if (type == '|') {                               
-        scanDirection(startX, startY, 0, -1, '|', allObjects, beam);
-        scanDirection(startX, startY, 0, 1, '|', allObjects, beam);
+        scanDirection(startX, startY, 0, -1, '|', sid, allObjects, beam); // למעלה
+        scanDirection(startX, startY, 0, 1, '|', sid, allObjects, beam);  // למטה
     }
 
     return beam;
@@ -101,9 +98,15 @@ void LevelLoader::createObject(char c, int x, int y, ScreenId screenId, std::vec
     {
     case '/': gameObjects.push_back(new Switch(x, y, screenId)); break;
     case '-': case '|': gameObjects.push_back(new Laser(x, y, c, screenId)); break;
+    case 'D': // טיפול כללי בדלתות (אם יש D בקובץ)
+        // ברירת מחדל, תעודכן אח"כ ב-parseDoorData
+        gameObjects.push_back(new Door(x, y, c, screenId, -1, ScreenId::ROOM1, false));
+        break;
+        // טיפול במספרים שמייצגים דלתות בקובץ ASCII
     case '0': case '1': case '2': case '3': case '4':
     case '5': case '6': case '7': case '8': case '9':
         gameObjects.push_back(new Door(x, y, c, screenId, -1, ScreenId::ROOM1, false)); break;
+
     case 'K': gameObjects.push_back(new Key(x, y, 'K', screenId, -1)); break;
     case '!': gameObjects.push_back(new Torch(x, y, '!', screenId)); break;
     case '?': gameObjects.push_back(new Riddle(x, y, screenId)); break;
@@ -119,7 +122,7 @@ void LevelLoader::createObject(char c, int x, int y, ScreenId screenId, std::vec
     }
 }
 
-void LevelLoader::parseConnectCommand(const std::string& line, std::vector<GameObject*>& gameObjects)
+void LevelLoader::parseConnectCommand(const std::string& line, std::vector<GameObject*>& gameObjects, ScreenId screenId)
 {
     std::stringstream ss(line);
     std::string command;
@@ -127,14 +130,13 @@ void LevelLoader::parseConnectCommand(const std::string& line, std::vector<GameO
 
     ss >> command >> switchX >> switchY >> targetX >> targetY;
 
-    GameObject* objSwitch = findObjectAt(switchX, switchY, gameObjects);
-    GameObject* objTarget = findObjectAt(targetX, targetY, gameObjects);
+    // חיפוש המתג והמטרה רק במסך הרלוונטי
+    GameObject* objSwitch = findObjectAt(switchX, switchY, screenId, gameObjects);
+    GameObject* objTarget = findObjectAt(targetX, targetY, screenId, gameObjects);
 
     Switch* mySwitch = dynamic_cast<Switch*>(objSwitch);
 
     if (mySwitch == nullptr) {
-        // אופציונלי: הדפסת שגיאה אם לא נמצא מתג
-        // std::cerr << "[ERROR] Switch NOT FOUND at (" << switchX << "," << switchY << ")" << std::endl;
         return;
     }
 
@@ -171,21 +173,19 @@ void LevelLoader::parseConnectCommand(const std::string& line, std::vector<GameO
     }
 }
 
-void LevelLoader::parseSpringData(const std::string& line, std::vector<GameObject*>& gameObjects)
+void LevelLoader::parseSpringData(const std::string& line, std::vector<GameObject*>& gameObjects, ScreenId screenId)
 {
     std::stringstream ss(line);
     std::string command;
     int dataX, dataY;
     char dirChar;
-    int screenIdInt;
-    int length = 3; // ערך ברירת מחדל למקרה שלא צוין אורך בקובץ
+    int screenIdInt; // (אנחנו קוראים אותו מהקובץ אבל משתמשים ב-screenId שקיבלנו מהפונקציה לאמינות)
+    int length = 3;
 
-    // הקריאה כוללת כעת את length בסוף
     ss >> command >> dataX >> dataY >> dirChar >> screenIdInt >> length;
 
-    GameObject* obj = findObjectAt(dataX, dataY, gameObjects);
+    GameObject* obj = findObjectAt(dataX, dataY, screenId, gameObjects);
 
-    // הגנות: אם האובייקט לא נמצא או שהוא לא קפיץ
     if (!obj) return;
     Spring* spring = dynamic_cast<Spring*>(obj);
     if (!spring) return;
@@ -198,11 +198,10 @@ void LevelLoader::parseSpringData(const std::string& line, std::vector<GameObjec
     case 'R': dir = Direction::RIGHT; break;
     }
 
-    // בנייה מחדש של הקפיץ עם האורך והכיוון המדויקים מהקובץ
     spring->rebuild(dir, length);
 }
 
-void LevelLoader::parseDoorData(const std::string& line, std::vector<GameObject*>& gameObjects)
+void LevelLoader::parseDoorData(const std::string& line, std::vector<GameObject*>& gameObjects, ScreenId screenId)
 {
     std::stringstream ss(line);
     std::string command;
@@ -210,7 +209,7 @@ void LevelLoader::parseDoorData(const std::string& line, std::vector<GameObject*
 
     ss >> command >> x >> y >> id >> targetScreenInt >> lockedInt;
 
-    GameObject* obj = findObjectAt(x, y, gameObjects);
+    GameObject* obj = findObjectAt(x, y, screenId, gameObjects);
     Door* door = dynamic_cast<Door*>(obj);
 
     if (door != nullptr)
@@ -220,7 +219,7 @@ void LevelLoader::parseDoorData(const std::string& line, std::vector<GameObject*
     }
 }
 
-void LevelLoader::parseKeyData(const std::string& line, std::vector<GameObject*>& gameObjects)
+void LevelLoader::parseKeyData(const std::string& line, std::vector<GameObject*>& gameObjects, ScreenId screenId)
 {
     std::stringstream ss(line);
     std::string command;
@@ -228,7 +227,7 @@ void LevelLoader::parseKeyData(const std::string& line, std::vector<GameObject*>
 
     ss >> command >> x >> y >> id;
 
-    GameObject* obj = findObjectAt(x, y, gameObjects);
+    GameObject* obj = findObjectAt(x, y, screenId, gameObjects);
     Key* key = dynamic_cast<Key*>(obj);
 
     if (key != nullptr)
@@ -371,13 +370,14 @@ void LevelLoader::loadLevelFromFile(const std::string& fileName, Screen& screen,
     screen.setLayout(mapLayout);
 
     // Pass 3: Metadata parsing
+    // כאן התיקון הגדול - מעבירים את ה-currentScreenId לכל פונקציית Parse
     for (const auto& meta : metadata)
     {
-        if (meta.find("CONNECT") != std::string::npos)      parseConnectCommand(meta, gameObjects);
-        else if (meta.find("DOOR_DATA") != std::string::npos) parseDoorData(meta, gameObjects);
-        else if (meta.find("KEY_DATA") != std::string::npos)  parseKeyData(meta, gameObjects);
+        if (meta.find("CONNECT") != std::string::npos)      parseConnectCommand(meta, gameObjects, currentScreenId);
+        else if (meta.find("DOOR_DATA") != std::string::npos) parseDoorData(meta, gameObjects, currentScreenId);
+        else if (meta.find("KEY_DATA") != std::string::npos)  parseKeyData(meta, gameObjects, currentScreenId);
         else if (meta.find("DARK") != std::string::npos) screen.setDark(true);
-        else if (meta.find("SPRING_DATA") != std::string::npos) parseSpringData(meta, gameObjects);
+        else if (meta.find("SPRING_DATA") != std::string::npos) parseSpringData(meta, gameObjects, currentScreenId);
     }
 }
 

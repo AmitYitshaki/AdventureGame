@@ -17,20 +17,21 @@ public:
 private:
     // --- פונקציות עזר פנימיות (לוגיקה) ---
 
-    static void parseDoorData(const std::string& line, std::vector<GameObject*>& gameObjects);
+    // עדכנו את החתימות לקבל ScreenId
+    static void parseDoorData(const std::string& line, std::vector<GameObject*>& gameObjects, ScreenId screenId);
 
-    static  void parseKeyData(const std::string& line, std::vector<GameObject*>& gameObjects);
+    static  void parseKeyData(const std::string& line, std::vector<GameObject*>& gameObjects, ScreenId screenId);
 
-    static void parseSpringData(const std::string& line, std::vector<GameObject*>& gameObjects);
+    static void parseSpringData(const std::string& line, std::vector<GameObject*>& gameObjects, ScreenId screenId);
 
     // יצירת אובייקט בודד (לפי תו)
     static void createObject(char c, int x, int y, ScreenId screenId, std::vector<GameObject*>& gameObjects);
 
-    // מציאת אובייקט בזיכרון לפי מיקום
-    static GameObject* findObjectAt(int x, int y, const std::vector<GameObject*>& gameObjects);
+    // מציאת אובייקט בזיכרון לפי מיקום ו-ScreenId (התיקון הקריטי)
+    static GameObject* findObjectAt(int x, int y, ScreenId screenId, const std::vector<GameObject*>& gameObjects);
 
     // לוגיקה לחיבור מתגים (CONNECT)
-    static void parseConnectCommand(const std::string& line, std::vector<GameObject*>& gameObjects);
+    static void parseConnectCommand(const std::string& line, std::vector<GameObject*>& gameObjects, ScreenId screenId);
 
     // --- אלגוריתם שרשור הלייזרים ---
 
@@ -38,7 +39,7 @@ private:
     static std::vector<GameObject*> collectLaserBeam(Laser* startNode, const std::vector<GameObject*>& allObjects);
 
     // סריקה בכיוון מסוים
-    static void scanDirection(int startX, int startY, int dx, int dy, char type,
+    static void scanDirection(int startX, int startY, int dx, int dy, char type, ScreenId screenId,
         const std::vector<GameObject*>& allObjects,
         std::vector<GameObject*>& outputBeam);
 };
