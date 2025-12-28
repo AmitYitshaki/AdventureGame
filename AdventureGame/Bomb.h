@@ -1,37 +1,37 @@
 ﻿#pragma once
-#include "Point.h"
-#include "ScreenID.h"
 #include "GameObject.h"
-#include <vector>
-#include <string>
 
-// forward declarations (כדי שה-header יתקמפל מהר ונקי)
-class Player;
-class Screen;
+/*
+ * ===================================================================================
+ * Class: Bomb
+ * -----------------------------------------------------------------------------------
+ * Purpose:
+ * A collectible item that can be placed and activated to destroy nearby objects.
+ *
+ * Behavior:
+ * - Starts as a collectible item ('@').
+ * - When dropped, it activates a countdown timer.
+ * - Visual changes during countdown (3..2..1).
+ * - Explodes, triggering destruction logic in the Game class.
+ *
+ * Implementation:
+ * - Inherits from GameObject.
+ * - Uses an internal `tick()` counter updated by the game loop.
+ * ===================================================================================
+ */
 
 class Bomb : public GameObject
 {
 private:
-	bool active = false;        // האם הפצצה פעילה (סופרת לאחור)
-	bool exploded = false;
-	static constexpr int COUNTDOWN_TICKS = 24; // מספר הטיקים עד הפיצוץ	
-	int ticksLeft = COUNTDOWN_TICKS; // טיקים שנותרו עד הפיצוץ
-	static constexpr int EXPLOSION_RADIUS = 3; // רדיוס הפיצוץ
+	bool active = false;
+	int ticksLeft;
+	static constexpr int COUNTDOWN_TICKS = 24;
+	static constexpr int EXPLOSION_RADIUS = 3;
+
 public:
-	// Constructor
 	Bomb(int x, int y, ScreenId screen);
-		
 	bool handleCollision(Player& p, const Screen& screen) override;
-
-	void activate(); // Activate the bomb (start countdown)
-
-	bool isactive() const { return active; }
-
-	bool isExploded() const { return exploded; }
-	
+	void activate();
 	static constexpr int getExplosionRadius() { return EXPLOSION_RADIUS; }
-
-	bool tick(); // Returns true if exploded this tick
-
+	bool tick();
 };
-

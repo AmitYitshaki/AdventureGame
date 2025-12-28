@@ -1,6 +1,16 @@
 ﻿#pragma once
 #include "GameObject.h"
 
+/*
+ * ===================================================================================
+ * Class: Key
+ * -----------------------------------------------------------------------------------
+ * Purpose:
+ * A collectible item used to unlock Doors.
+ * Stores a unique ID to match specific doors.
+ * ===================================================================================
+ */
+
 class Key : public GameObject
 {
 private:
@@ -8,14 +18,11 @@ private:
 
 public:
     Key(int x, int y, char c, ScreenId screen, int id)
-        : GameObject(x, y, c, screen, false, false), // solid=false, static=false
+        : GameObject(x, y, c, screen, false, false),
         keyID(id)
     {
     }
 
     void setKeyID(int newID) { keyID = newID; }
     int getKeyID() const { return keyID; }
-
-    // מחקנו את handleCollision!
-    // המפתח ישתמש בפונקציה של האבא (GameObject) שתקרא ל-player.collectItem(this)
 };

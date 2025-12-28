@@ -1,19 +1,34 @@
 ﻿#include "Screen.h"
-#include "Utils.h" // For gotoxy
+#include "Utils.h"
 #include <iostream>
-
-/*
-    Screen.cpp
-    Holds the implementation of the draw function.
-    Constructors and setters are now inline in Screen.h
-*/
 
 void Screen::draw() const
 {
-    // הזזה לתחילת המסך וציור כל השורות
     gotoxy(0, 0);
     for (const auto& line : layout)
     {
         std::cout << line << '\n';
+    }
+}
+
+const std::string& Screen::getLine(int row) const
+{
+    static const std::string emptyLine = "";
+    if (row >= 0 && row < (int)layout.size()) return layout[row];
+    return emptyLine;
+}
+
+void Screen::setLine(int row, const std::string& line)
+{
+    if (row >= 0 && row < HEIGHT) {
+        if (layout.size() < HEIGHT) layout.resize(HEIGHT, std::string(WIDTH, ' '));
+        layout[row] = line;
+    }
+}
+
+void Screen::setChar(int x, int y, char c)
+{
+    if (inBounds(x, y)) {
+        layout[y][x] = c;
     }
 }

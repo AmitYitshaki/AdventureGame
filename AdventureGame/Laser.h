@@ -1,20 +1,32 @@
 ﻿#pragma once
 #include "GameObject.h"
 
+/*
+ * ===================================================================================
+ * Class: Laser
+ * -----------------------------------------------------------------------------------
+ * Purpose:
+ * A hazard barrier that blocks movement. Controlled remotely by Switches.
+ *
+ * Behavior:
+ * - Active state: Draws a beam ('-' or '|') and blocks player.
+ * - Inactive state: Invisible and passable.
+ * - Responds to `receiveSignal()` events from a Switch.
+ *
+ * Implementation:
+ * - Inherits from GameObject.
+ * - Overrides `drawToBuffer` to handle visibility toggling.
+ * ===================================================================================
+ */
+
 class Laser : public GameObject
 {
 private:
-    bool active;         // האם הלייזר דולק כרגע?
-    char originalSymbol; // שומר את הצורה המקורית (- או |)
+    bool active;
+    char originalSymbol;
 
 public:
     Laser(int x, int y, char c, ScreenId screen);
-
-    bool isActive() const { return active; }
-
-    // קבלת אות מהמתג: הופך את המצב (Toggle)
     void receiveSignal(bool state) override;
-
-    // טיפול בהתנגשות: הורג/חוסם רק אם דולק
     bool handleCollision(Player& p, const Screen& screen) override;
 };

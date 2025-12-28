@@ -1,5 +1,4 @@
 ﻿#pragma once
-
 #include <vector>
 #include <string>
 #include "Point.h"
@@ -7,58 +6,49 @@
 #include "GameObject.h"
 #include "Direction.h"
 
-// Forward declarations
 class Player;
 class Screen;
 
 /*
-    Spring:
-    A dynamic multi-segment spring that compresses when a player
-    moves over it from the correct direction.
-    Supports dynamic length and partial destruction by explosions.
-*/
+ * ===================================================================================
+ * Class: Spring
+ * -----------------------------------------------------------------------------------
+ * Purpose:
+ * A dynamic object that launches the player into the air ("Flight Mode").
+ *
+ * Behavior:
+ * - Multi-segment object (Base 'W' + Tail 'w').
+ * - Compresses when stepped on from the correct direction.
+ * - Calculates launch power based on its length.
+ *
+ * Implementation:
+ * - Inherits from GameObject.
+ * - Contains logic to rebuild itself if rotated or damaged.
+ * ===================================================================================
+ */
+
 class Spring : public GameObject
 {
 public:
-    // בנאי: מקבל מיקום בסיס, כיוון, מסך ואורך התחלתי
-    Spring(const Point& basePosition,
-        Direction dir,
-        ScreenId screenId,
-        int length);
+    Spring(const Point& basePosition, Direction dir, ScreenId screenId, int length);
 
-    // --- Drawing ---
-	void drawToBuffer(std::vector<std::string>& buffer) const override;
-
-    // --- Collision & Logic ---
+    void drawToBuffer(std::vector<std::string>& buffer) const override;
     bool isAtPosition(int x, int y) const override;
     bool handleCollision(Player& p, const Screen& screen) override;
+    bool handleExplosionAt(int x, int y) override;
 
-    // --- Explosion Handling ---
-    // מוחקת חלק מהקפיץ שנפגע. 
-    // מחזירה true אם הקפיץ הושמד כליל (אם הבסיס נפגע או לא נשארו חלקים)
-	bool handleExplosionAt(int x, int y) override;
-
-    // --- Properties ---
-    void setDirection(Direction newDir); // מעדכנת כיוון לכל החלקים הקיימים
+    void setDirection(Direction newDir);
     Direction getDirection() const { return direction; }
     Direction getOppositeDirection() const { return oppositeDir; }
-
-    // הכוח שווה למספר החלקים שנותרו כרגע
     int getLength() const { return (int)parts.size(); }
-
-    // פונקציה לבניית הקפיץ מחדש (נקראת ע"י LevelLoader לטעינת נתונים)
     void rebuild(Direction dir, int length);
 
 private:
-    // parts[0] תמיד יהיה הבסיס (החלק שטוען את הקפיץ)
     std::vector<Point> parts;
-
     Direction direction;
     Direction oppositeDir;
 
     void loadSpring(Player& p);
-
-    // פונקציות עזר פנימיות
     static void getDelta(Direction d, int& dx, int& dy);
     static Direction oppositeDirection(Direction d);
 };

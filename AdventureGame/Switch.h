@@ -2,23 +2,33 @@
 #include "GameObject.h"
 #include <vector>
 
+/*
+ * ===================================================================================
+ * Class: Switch
+ * -----------------------------------------------------------------------------------
+ * Purpose:
+ * An interactive floor trigger that toggles the state of connected objects.
+ *
+ * Behavior:
+ * - Toggles state (Active/Inactive) when a player steps on it.
+ * - Changes visual appearance ('/' vs '\').
+ * - Sends signals to all linked targets (e.g., turns Lasers on/off).
+ *
+ * Implementation:
+ * - Inherits from GameObject.
+ * - Holds a list of pointers to target GameObjects (Observer pattern lite).
+ * ===================================================================================
+ */
+
 class Switch : public GameObject
 {
 private:
-    bool active;                      // האם המתג לחוץ?
-    std::vector<GameObject*> targets; // רשימת לייזרים שמחוברים למתג
+    bool active;
+    std::vector<GameObject*> targets;
 
 public:
     Switch(int x, int y, ScreenId screen);
-
-    bool isActive() const { return active; }
-
-    // חיבור לייזר למתג (נקרא ע"י CONNECT)
     void addTarget(GameObject* obj);
-
-    // פעולה בעת דריכה
     bool handleCollision(Player& p, const Screen& screen) override;
-
-    // פונקציית עזר לשינוי מצב
     void toggle();
 };

@@ -10,75 +10,55 @@
 #include "Obstacle.h"
 #include <vector>
 
-/*
-    Player.cpp
-    Implements normal movement, flying (spring launch),
-    item handling, collisions, and life system.
-*/
-
 Player::~Player()
 {
-	heldItem = nullptr; // Do not delete held item; managed by Game
+    heldItem = nullptr;
 }
 
 void Player::resetForNewGame(int x, int y, char c, int hudPos, ScreenId startLevel)
 {
-    // Position & char
-    point.setPos(x, y);   // לפי השינוי שעשית (setPos)
+    point.setPos(x, y);
     point.setChar(c);
-
-    // HUD location
     hudX = hudPos;
     hudY = 0;
-
-    // Basic movement state
     dir = Direction::STAY;
     speed = 1;
     force = 1;
-
-    // Life & score & level
-	score = 0;
+    score = 0;
     live = 3;
     currentLevel = startLevel;
-
-    // Spring / flying state
     flying = false;
     loaded = false;
     springTicksLeft = 0;
     lastLoadedSpringLength = 0;
     launchDirection = Direction::STAY;
-
-    // Inventory
     heldItem = nullptr;
 }
 
-
-
-/* ----------------------------------------------------
-                     MOVEMENT
-   ---------------------------------------------------- */
+void Player::stopMovement()
+{
+    dir = Direction::STAY;
+}
 
 void Player::calculateMovementDelta(int& dx, int& dy) const
 {
     dx = 0; dy = 0;
 
-    // לוגיקה לתעופה (Spring)
     if (isFlying())
     {
-        // כיוון בסיסי לפי השיגור
         switch (launchDirection)
         {
         case Direction::UP:    dy = -1; break;
         case Direction::DOWN:  dy = 1;  break;
         case Direction::LEFT:  dx = -1; break;
         case Direction::RIGHT: dx = 1;  break;
+        default: break;
         }
 
-        // הטיה (Steering) תוך כדי תעופה
+        // Steering while flying
         if (dir == Direction::UP)    dy -= 1;
         else if (dir == Direction::DOWN) dy += 1;
     }
-    // לוגיקה להליכה רגילה
     else
     {
         switch (dir)
@@ -87,20 +67,17 @@ void Player::calculateMovementDelta(int& dx, int& dy) const
         case Direction::DOWN:  dy = 1;  break;
         case Direction::LEFT:  dx = -1; break;
         case Direction::RIGHT: dx = 1;  break;
+        default: break;
         }
     }
 }
 
 bool Player::isBlockedByStatic(int x, int y, const Screen& screen, Player* otherPlayer) const
 {
-    // 1. בדיקת קירות
     if (screen.isWall(Point(x, y, ' '))) {
         return true;
     }
 
-    // 2. בדיקת שחקן אחר - התיקון לבעיה הקטנה!
-    // הסרנו את הבדיקה (dir == STAY).
-    // לא משנה לאן הוא זז, אם הוא כרגע במשבצת היעד - זה חסום.
     if (otherPlayer)
     {
         if (otherPlayer->getX() == x && otherPlayer->getY() == y)
@@ -108,7 +85,6 @@ bool Player::isBlockedByStatic(int x, int y, const Screen& screen, Player* other
             return true;
         }
     }
-
     return false;
 }
 
@@ -120,16 +96,13 @@ bool Player::handleObjectInteractions(const Screen& screen, std::vector<GameObje
 
     for (auto obj : gameObjects)
     {
-        // סינונים מהירים
         if (!obj || obj->getScreenId() != currentScreenId || obj->isCollected())
             continue;
 
-        // האם דרכנו על האובייקט?
         if (obj->isAtPosition(px, py))
         {
             bool allowed = true;
 
-            // טיפול ספציפי למכשול (דורש את השחקן השני לדחיפה)
             if (auto obstacle = dynamic_cast<Obstacle*>(obj))
             {
                 allowed = obstacle->handleCollision(*this, screen, otherPlayer, gameObjects);
@@ -139,11 +112,10 @@ bool Player::handleObjectInteractions(const Screen& screen, std::vector<GameObje
                 allowed = obj->handleCollision(*this, screen);
             }
 
-            // אם האובייקט חסם אותנו
             if (!allowed) return false;
         }
     }
-    return true; // הכל עבר בשלום
+    return true;
 }
 
 void Player::handleStop()
@@ -152,108 +124,75 @@ void Player::handleStop()
         stopSpringEffect();
     }
     else {
-        stopMovement(); // מאפס כיוון ל-STAY
+        stopMovement();
     }
 }
 
 void Player::move(Screen& screen, std::vector<GameObject*>& gameObjects, Player* otherPlayer)
 {
-    // 1. בדיקות מקדימות
     if (point.getX() == -1 || isLoaded()) return;
 
-    // 2. חישוב לאן רוצים לזוז
     int dx = 0, dy = 0;
-    calculateMovementDelta(dx, dy); // עכשיו זו הפונקציה היחידה שמחשבת תנועה
+    calculateMovementDelta(dx, dy);
 
     if (dx == 0 && dy == 0) return;
 
     Point nextPos(point.getX() + dx, point.getY() + dy, ' ');
 
-    // 3. בדיקת חסימות סטטיות (קירות או שחקנים)
     if (isBlockedByStatic(nextPos.getX(), nextPos.getY(), screen, otherPlayer))
     {
-        // === התיקון לבעיה הגדולה: התנגשות בתעופה ===
-
-        // האם החסימה היא בגלל שחקן אחר?
         if (otherPlayer && otherPlayer->getX() == nextPos.getX() && otherPlayer->getY() == nextPos.getY())
         {
-            // האם אני כרגע עף? (כמו רכב דוהר)
             if (isFlying())
             {
-                // 1. העברת האנרגיה לשחקן הנפגע
-                // הוא יעוף באותו כיוון שאני עפתי אליו
+                // Momentum transfer logic
                 otherPlayer->setLaunchDirection(this->dir);
-
-                // הוא מקבל את המהירות/כוח שלי (תלוי איך מימשת, נניח לפי speed)
                 otherPlayer->startSpringEffect(this->speed);
-
-                // 2. השחקן הפוגע (אני) נעצר במקום (כמו רכב שנכנס בקיר)
                 this->stopSpringEffect();
-
-                // הודעה נחמדה
                 Game::setStatusMessage("CRASH! Momentum transferred!");
             }
             else
             {
-                // אם סתם הלכנו ונתקענו בו - סתם עוצרים
                 handleStop();
             }
         }
         else
         {
-            // חסימה רגילה (קיר)
             handleStop();
         }
-
-        return; // בכל מקרה לא נכנסים למשבצת התפוסה
+        return;
     }
 
-    // 4. ביצוע התזוזה הפיזית
     point.move(dx, dy);
 
-    // 5. אינטראקציה עם אובייקטים
     if (!handleObjectInteractions(screen, gameObjects, otherPlayer))
     {
-        // ביטול צעד (Undo)
-        point.move(-dx, -dy);
+        point.move(-dx, -dy); // Undo move
 
         if (isFlying()) {
-            stopSpringEffect(); // התרסקות לתוך מכשול
-        }
-        else {
-            // הליכה רגילה שנתקעה - לא עוצרים כיוון כדי לאפשר דחיפה משותפת
+            stopSpringEffect();
         }
     }
 }
 
-
-
-/* ----------------------------------------------------
-                    SPRING LAUNCH
-   ---------------------------------------------------- */
-
 void Player::launch(int springLength)
 {
-    // springLength = N, startSpringEffect computes N^2
     startSpringEffect(springLength);
 }
 
 void Player::startSpringEffect(int springLength)
 {
-    // Duration = N^2 game cycles
     springTicksLeft = springLength * springLength;
-
     flying = true;
     loaded = false;
-	speed = springLength;
+    speed = springLength;
     force = springLength;
-    dir = launchDirection; // lock initial launch direction
+    dir = launchDirection;
 }
 
 void Player::updateSpringEffect()
 {
-    if (!flying)
-        return;
+    if (!flying) return;
 
     if (springTicksLeft > 0)
         springTicksLeft--;
@@ -267,15 +206,10 @@ void Player::stopSpringEffect()
     flying = false;
     springTicksLeft = 0;
     speed = 1;
-	force = 1;
-
+    force = 1;
     launchDirection = Direction::STAY;
     dir = Direction::STAY;
 }
-
-/* ----------------------------------------------------
-                    ITEM HANDLING
-   ---------------------------------------------------- */
 
 bool Player::collectItem(GameObject* item)
 {
@@ -283,10 +217,7 @@ bool Player::collectItem(GameObject* item)
     {
         heldItem = item;
         item->Collected();
-
-        // Attach to HUD position
-        item->setPosition(hudX+13, hudY);
-
+        item->setPosition(hudX + 13, hudY);
         Game::setStatusMessage(std::string("Collected item '") + item->getChar() + "'");
         return true;
     }
@@ -295,11 +226,9 @@ bool Player::collectItem(GameObject* item)
 
 GameObject* Player::dropItemToScreen(ScreenId currentScreenID)
 {
-    if (!hasItem())
-        return nullptr;
+    if (!hasItem()) return nullptr;
 
     GameObject* itemToDrop = heldItem;
-
     itemToDrop->setPosition(point.getX(), point.getY());
     itemToDrop->setScreenId(currentScreenID);
     itemToDrop->drop();
@@ -307,11 +236,11 @@ GameObject* Player::dropItemToScreen(ScreenId currentScreenID)
     if (itemToDrop->getChar() == '@')
     {
         static_cast<Bomb*>(itemToDrop)->activate();
-        Game::setStatusMessage("Bomb activated! RUN!"); 
+        Game::setStatusMessage("Bomb activated! RUN!");
     }
-
-    else 
+    else {
         Game::setStatusMessage(std::string("Dropped item '") + itemToDrop->getChar() + "'");
+    }
 
     heldItem = nullptr;
     return itemToDrop;
@@ -325,10 +254,6 @@ void Player::removeHeldItem()
         heldItem = nullptr;
     }
 }
-
-/* ----------------------------------------------------
-                    INVENTORY QUERIES
-   ---------------------------------------------------- */
 
 int Player::getHeldKeyID() const
 {
@@ -354,7 +279,6 @@ Riddle* Player::getHeldRiddle() const
 {
     if (hasRiddle())
         return dynamic_cast<Riddle*>(heldItem);
-
     return nullptr;
 }
 
@@ -363,13 +287,8 @@ char Player::getItemChar() const
     return heldItem ? heldItem->getChar() : ' ';
 }
 
-/* ----------------------------------------------------
-                        LIFE SYSTEM
-   ---------------------------------------------------- */
-
 void Player::initForLevel(int x, int y, char c, ScreenId levelID)
 {
-    // 1. מיקום פיזי (Physical Position)
     point.setPos(x, y);
     point.setChar(c);
     dir = Direction::STAY;
@@ -391,3 +310,10 @@ void Player::resetStats() {
     savedScore = 0;
 }
 
+void Player::restoreState() {
+    live = savedLife;
+    score = savedScore;
+    heldItem = nullptr;
+    flying = false;
+    loaded = false;
+}

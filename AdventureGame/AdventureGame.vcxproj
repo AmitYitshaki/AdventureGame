@@ -131,7 +131,6 @@
     <ClInclude Include="Key.h" />
     <ClInclude Include="Laser.h" />
     <ClInclude Include="LevelLoader.h" />
-    <ClInclude Include="Logger.h" />
     <ClInclude Include="Obstacle.h" />
     <ClInclude Include="Player.h" />
     <ClInclude Include="Point.h" />
@@ -150,11 +149,9 @@
     <ClCompile Include="GameObject.cpp" />
     <ClCompile Include="Laser.cpp" />
     <ClCompile Include="LevelLoader.cpp" />
-    <ClCompile Include="Logger.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="Obstacle.cpp" />
     <ClCompile Include="Player.cpp" />
-    <ClCompile Include="Point.cpp" />
     <ClCompile Include="Riddle.cpp" />
     <ClCompile Include="Screen.cpp" />
     <ClCompile Include="Spring.cpp" />

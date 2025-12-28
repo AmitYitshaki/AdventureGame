@@ -3,41 +3,50 @@
 #include <vector>
 #include <string>
 
-// מבנה נתונים פשוט שמחזיק את תוכן החידה
+/*
+ * ===================================================================================
+ * Class: Riddle
+ * -----------------------------------------------------------------------------------
+ * Purpose:
+ * An interactive object that pauses gameplay to present a trivia question.
+ *
+ * Behavior:
+ * - Triggered on collision.
+ * - Switches Game mode to "RiddleMode".
+ * - Validates player answer input (1-4).
+ * - Rewards points for correct answers, penalizes life for wrong ones.
+ *
+ * Implementation:
+ * - Inherits from GameObject.
+ * - Stores the question text and correct answer index.
+ * ===================================================================================
+ */
+
 struct RiddleData {
     int id = -1;
-	int correctAnswer = 1; // ברירת מחדל: תשובה 1
+    int correctAnswer = 1;
     std::vector<std::string> textLines;
 };
 
 class Riddle : public GameObject
 {
 private:
-    RiddleData data; // הנתונים שהוזרקו לחידה
+    RiddleData data;
     bool solved = false;
 
 public:
-    // גודל ה-Overlay (כמעט כל המסך)
     static constexpr int WIDTH = 76;
     static constexpr int HEIGHT = 22;
 
-    Riddle(int x, int y, ScreenId screen)
-        : GameObject(x, y, '?', screen) {
-    }
+    Riddle(int x, int y, ScreenId screen) : GameObject(x, y, '?', screen) {}
 
-    // פונקציה להזרקת הנתונים (נקראת ע"י Game)
     void setData(const RiddleData& newData) { data = newData; }
-
     int getCorrectAnswer() const { return data.correctAnswer; }
 
-    // שליפת שורה לציור
     const char* getLine(int row) const {
         if (row < 0 || row >= (int)data.textLines.size()) return "";
         return data.textLines[row].c_str();
     }
-
-    bool isSolved() const { return solved; }
-    void markSolved() { solved = true; }
 
     bool handleCollision(Player& p, const Screen& screen) override;
 };

@@ -1,6 +1,15 @@
 #pragma once
 
-// Logical identifiers of all available screens in the game.
+/*
+ * ===================================================================================
+ * Enum: ScreenId
+ * -----------------------------------------------------------------------------------
+ * Purpose:
+ * Defines unique identifiers for all game screens (Levels, Menu, Instructions).
+ * Used by the ScreenManager/Game class to handle transitions and array indexing.
+ * ===================================================================================
+ */
+
 enum class ScreenId
 {
     HOME = 0,
