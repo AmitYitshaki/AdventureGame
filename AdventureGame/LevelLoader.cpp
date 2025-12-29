@@ -9,6 +9,8 @@
 #include "Bomb.h"
 #include "Obstacle.h" 
 #include "Direction.h"
+#include "GameException.h" // Added for error handling
+
 #include <fstream>
 #include <iostream>
 #include <sstream>
@@ -23,7 +25,6 @@ GameObject* LevelLoader::findObjectAt(int x, int y, ScreenId screenId, const std
     return nullptr;
 }
 
-
 void LevelLoader::scanDirection(int startX, int startY, int dx, int dy, char type, ScreenId screenId,
     const std::vector<GameObject*>& allObjects,
     std::vector<GameObject*>& outputBeam)
@@ -33,6 +34,9 @@ void LevelLoader::scanDirection(int startX, int startY, int dx, int dy, char typ
 
     while (true)
     {
+        // Safe check: Ensure we don't scan outside bounds (infinite loops safety)
+        if (currX < 0 || currX >= Screen::WIDTH || currY < 0 || currY >= Screen::HEIGHT) break;
+
         GameObject* obj = findObjectAt(currX, currY, screenId, allObjects);
         if (!obj) break;
 
@@ -86,11 +90,25 @@ void LevelLoader::parseConnectCommand(const std::string& line, std::vector<GameO
 
     ss >> command >> switchX >> switchY >> targetX >> targetY;
 
+    // Validation: Check if the line format is correct
+    GameException::ensureStreamGood(ss, "Corrupt CONNECT command format: " + line, "LevelLoader::parseConnectCommand");
+
+    // Validation: Check bounds
+    GameException::ensureInBounds(switchX, switchY, "LevelLoader::parseConnectCommand (Switch Pos)");
+    GameException::ensureInBounds(targetX, targetY, "LevelLoader::parseConnectCommand (Target Pos)");
+
     GameObject* objSwitch = findObjectAt(switchX, switchY, screenId, gameObjects);
     GameObject* objTarget = findObjectAt(targetX, targetY, screenId, gameObjects);
 
-    Switch* mySwitch = dynamic_cast<Switch*>(objSwitch);
+    // Validation: Ensure objects actually exist
+    GameException::ensureNotNull(objSwitch, "Switch not found at specified coordinates", "LevelLoader::parseConnectCommand");
+    GameException::ensureNotNull(objTarget, "Target object not found at specified coordinates", "LevelLoader::parseConnectCommand");
 
+    Switch* mySwitch = dynamic_cast<Switch*>(objSwitch);
+    // Validation: Ensure the object is indeed a Switch
+    GameException::ensureNotNull(mySwitch, "Object at coordinates is not a Switch", "LevelLoader::parseConnectCommand");
+
+    // Logic: Connect switch to target (or laser beam)
     if (mySwitch && objTarget)
     {
         Laser* laserTarget = dynamic_cast<Laser*>(objTarget);
@@ -117,13 +135,26 @@ void LevelLoader::parseSpringData(const std::string& line, std::vector<GameObjec
     int screenIdInt;
     int length = 3;
 
-    ss >> command >> dataX >> dataY >> dirChar >> screenIdInt >> length;
+    ss >> command >> dataX >> dataY >> dirChar >> screenIdInt;
+
+    // Validation: Stream integrity
+    GameException::ensureStreamGood(ss, "Corrupt SPRING_DATA format: " + line, "LevelLoader::parseSpringData");
+    // Validation: Bounds
+    GameException::ensureInBounds(dataX, dataY, "LevelLoader::parseSpringData");
+
+    // Optional length parsing
+    if (ss >> length) { /* Length parsed successfully */ }
+    else { ss.clear(); length = 3; } // Default length if missing
 
     GameObject* obj = findObjectAt(dataX, dataY, screenId, gameObjects);
-    if (!obj) return;
+
+    // Validation: Object existence
+    GameException::ensureNotNull(obj, "Spring object not found at (" + std::to_string(dataX) + "," + std::to_string(dataY) + ")", "LevelLoader::parseSpringData");
 
     Spring* spring = dynamic_cast<Spring*>(obj);
-    if (!spring) return;
+
+    // Validation: Type safety
+    GameException::ensureNotNull(spring, "Object at coordinates is not a Spring", "LevelLoader::parseSpringData");
 
     Direction dir = Direction::STAY;
     switch (dirChar) {
@@ -131,6 +162,9 @@ void LevelLoader::parseSpringData(const std::string& line, std::vector<GameObjec
     case 'D': dir = Direction::DOWN; break;
     case 'L': dir = Direction::LEFT; break;
     case 'R': dir = Direction::RIGHT; break;
+    default:
+        // Validation: Invalid Direction
+        throw GameException("Invalid direction char '" + std::string(1, dirChar) + "' in line: " + line, "LevelLoader::parseSpringData");
     }
 
     spring->rebuild(dir, length);
@@ -144,14 +178,22 @@ void LevelLoader::parseDoorData(const std::string& line, std::vector<GameObject*
 
     ss >> command >> x >> y >> id >> targetScreenInt >> lockedInt;
 
+    // Validation
+    GameException::ensureStreamGood(ss, "Corrupt DOOR_DATA format: " + line, "LevelLoader::parseDoorData");
+    GameException::ensureInBounds(x, y, "LevelLoader::parseDoorData");
+
     GameObject* obj = findObjectAt(x, y, screenId, gameObjects);
+
+    // Validation
+    GameException::ensureNotNull(obj, "Door object not found at (" + std::to_string(x) + "," + std::to_string(y) + ")", "LevelLoader::parseDoorData");
+
     Door* door = dynamic_cast<Door*>(obj);
 
-    if (door != nullptr)
-    {
-        ScreenId targetId = static_cast<ScreenId>(targetScreenInt);
-        door->setDoorProperties(id, targetId, (lockedInt == 1));
-    }
+    // Validation
+    GameException::ensureNotNull(door, "Object is not a Door", "LevelLoader::parseDoorData");
+
+    ScreenId targetId = static_cast<ScreenId>(targetScreenInt);
+    door->setDoorProperties(id, targetId, (lockedInt == 1));
 }
 
 void LevelLoader::parseKeyData(const std::string& line, std::vector<GameObject*>& gameObjects, ScreenId screenId)
@@ -162,13 +204,21 @@ void LevelLoader::parseKeyData(const std::string& line, std::vector<GameObject*>
 
     ss >> command >> x >> y >> id;
 
+    // Validation
+    GameException::ensureStreamGood(ss, "Corrupt KEY_DATA format: " + line, "LevelLoader::parseKeyData");
+    GameException::ensureInBounds(x, y, "LevelLoader::parseKeyData");
+
     GameObject* obj = findObjectAt(x, y, screenId, gameObjects);
+
+    // Validation
+    GameException::ensureNotNull(obj, "Key object not found at (" + std::to_string(x) + "," + std::to_string(y) + ")", "LevelLoader::parseKeyData");
+
     Key* key = dynamic_cast<Key*>(obj);
 
-    if (key != nullptr)
-    {
-        key->setKeyID(id);
-    }
+    // Validation
+    GameException::ensureNotNull(key, "Object is not a Key", "LevelLoader::parseKeyData");
+
+    key->setKeyID(id);
 }
 
 void LevelLoader::createObject(char c, int x, int y, ScreenId screenId, std::vector<GameObject*>& gameObjects)
@@ -202,9 +252,9 @@ void LevelLoader::createObject(char c, int x, int y, ScreenId screenId, std::vec
 void LevelLoader::loadLevelFromFile(const std::string& fileName, Screen& screen, std::vector<GameObject*>& gameObjects)
 {
     std::ifstream file(fileName);
-    if (!file) {
-        throw std::runtime_error("Failed to open level file: " + fileName);
-    }
+
+    // Validation: Ensure file opened successfully
+    GameException::ensureFileOpen(file, fileName, "LevelLoader::loadLevelFromFile");
 
     std::vector<std::string> rawLines;
     std::string line;
@@ -223,6 +273,7 @@ void LevelLoader::loadLevelFromFile(const std::string& fileName, Screen& screen,
         if (i < Screen::HEIGHT) mapLayout.push_back(rawLines[i]);
         else metadata.push_back(rawLines[i]);
     }
+    // Pad the map if file is short
     while (mapLayout.size() < Screen::HEIGHT) mapLayout.push_back(std::string(Screen::WIDTH, ' '));
 
     ScreenId currentScreenId = screen.getScreenId();
@@ -287,7 +338,10 @@ void LevelLoader::loadLevelFromFile(const std::string& fileName, Screen& screen,
 void LevelLoader::loadScreenFromFile(const std::string& fileName, Screen& screen)
 {
     std::ifstream file(fileName);
-    if (!file) throw std::runtime_error("Missing screen file: " + fileName);
+
+    // Validation: Ensure file opened successfully
+    GameException::ensureFileOpen(file, fileName, "LevelLoader::loadScreenFromFile");
+
     std::string line;
     int row = 0;
     while (std::getline(file, line) && row < Screen::HEIGHT) {

@@ -1,11 +1,16 @@
 ﻿#include "GameObject.h"
 #include "Player.h"
+#include "GameException.h"
 
 void GameObject::dropToScreen(int x, int y)
 {
+    if (x != -1) {
+        GameException::ensureInBounds(x, y, "GameObject::dropToScreen");
+    }
     point.setPos(x, y);
     collected = false;
 }
+
 
 void GameObject::removeFromGame()
 {

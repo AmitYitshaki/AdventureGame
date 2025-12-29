@@ -25,7 +25,7 @@
 #include "Screen.h"
 #include "Player.h"
 #include "LevelLoader.h"
-
+#include "GameException.h"
 
 #include "Bomb.h"
 #include "Key.h"
@@ -122,6 +122,7 @@ private:
     void visualizeExplosion(int cx, int cy, int radius);
     void updateBombs();
     void applyBombEffects(int cx, int cy, Screen& curr_screen, int R);
+    void safeDeleteObject(GameObject* objToRemove);
 
 public:
     static void setStatusMessage(const std::string& msg);

@@ -24,13 +24,12 @@ Game::~Game()
 void Game::initGame()
 {
     screens[(int)ScreenId::HOME] = Screen(ScreenId::HOME);
-    LevelLoader::loadScreenFromFile("StartScreen.txt", screens[(int)ScreenId::HOME]);
+    LevelLoader::loadScreenFromFile("adv-start.screen", screens[(int)ScreenId::HOME]);
 
     screens[(int)ScreenId::INSTRUCTIONS] = Screen(ScreenId::INSTRUCTIONS);
-    LevelLoader::loadScreenFromFile("InstructionsScreen.txt", screens[(int)ScreenId::INSTRUCTIONS]);
+    LevelLoader::loadScreenFromFile("adv-instructions.screen", screens[(int)ScreenId::INSTRUCTIONS]);
 
     currentScreen = &screens[(int)ScreenId::HOME];
-    loadRiddlesFromFile("Riddles.txt");
 }
 
 void Game::resetGame()
@@ -46,19 +45,20 @@ void Game::resetGame()
     player2.resetStats();
 
     screens[(int)ScreenId::ROOM1] = Screen(ScreenId::ROOM1);
-    LevelLoader::loadLevelFromFile("Room1ScreenV2.txt", screens[(int)ScreenId::ROOM1], gameObjects);//Room1ScreenV2.txt
+    LevelLoader::loadLevelFromFile("adv-world_01.screen ", screens[(int)ScreenId::ROOM1], gameObjects);
 
     screens[(int)ScreenId::ROOM2] = Screen(ScreenId::ROOM2);
-    LevelLoader::loadLevelFromFile("Room2Screen.txt", screens[(int)ScreenId::ROOM2], gameObjects);
+    LevelLoader::loadLevelFromFile("adv-world_02.screen", screens[(int)ScreenId::ROOM2], gameObjects);
 
     screens[(int)ScreenId::ROOM3] = Screen(ScreenId::ROOM3);
-    LevelLoader::loadLevelFromFile("Room3Screen.txt", screens[(int)ScreenId::ROOM3], gameObjects);
+    LevelLoader::loadLevelFromFile("adv-world_03.screen", screens[(int)ScreenId::ROOM3], gameObjects);
 
     screens[(int)ScreenId::ROOM4] = Screen(ScreenId::ROOM4);
-    LevelLoader::loadLevelFromFile("Room4Screen.txt", screens[(int)ScreenId::ROOM4], gameObjects);
-
-    goToScreen(ScreenId::ROOM1);
+    LevelLoader::loadLevelFromFile("adv-world_04.screen", screens[(int)ScreenId::ROOM4], gameObjects);
+    
     loadRiddlesFromFile("Riddles.txt");
+    goToScreen(ScreenId::ROOM1);
+    
 }
 
 void Game::start()
@@ -73,6 +73,70 @@ void Game::start()
     }
     cls();
 }
+
+void Game::restartCurrentLevel()
+{
+    ScreenId currentId = currentScreen->getScreenId();
+    for (auto obj : gameObjects) delete obj;
+    gameObjects.clear();
+    player1.restoreState();
+    player2.restoreState();
+
+    std::string filename;
+    switch (currentId) {
+    case ScreenId::ROOM1: filename = "adv-world_01.screen "; break;//adv-world_01.screen 
+    case ScreenId::ROOM2: filename = "adv-world_02.screen"; break;
+    case ScreenId::ROOM3: filename = "adv-world_03.screen"; break;
+    case ScreenId::ROOM4: filename = "adv-world_04.screen"; break;
+    default: filename = "adv-world_01.screen"; break;
+
+    }
+
+    screens[(int)currentId] = Screen(currentId);
+    LevelLoader::loadLevelFromFile(filename, screens[(int)currentId], gameObjects);
+
+    RiddleMode = false;
+    currentRiddle = nullptr;
+    currentRiddlePlayer = nullptr;
+    setStatusMessage("");
+    goToScreen(currentId);
+    assignRiddlesToLevel();
+}
+
+void Game::gameOverScreen(const std::string& message)
+{
+    playSound(100, 400);
+    system("cls");
+    const int BOX_WIDTH = 50;
+    const int BOX_HEIGHT = 9;
+    int x = (Screen::WIDTH - BOX_WIDTH) / 2;
+    int y = (Screen::HEIGHT - BOX_HEIGHT) / 2;
+
+    auto printCentered = [&](int rowOffset, const std::string& text) {
+        int padding = (BOX_WIDTH - 2 - (int)text.length()) / 2;
+        gotoxy(x, y + rowOffset);
+        std::cout << "#" << std::string(padding, ' ') << text << std::string(BOX_WIDTH - 2 - padding - text.length(), ' ') << "#";
+        };
+
+    gotoxy(x, y);     std::cout << std::string(BOX_WIDTH, '#');
+    for (int i = 1; i < BOX_HEIGHT - 1; ++i) {
+        gotoxy(x, y + i); std::cout << "#" << std::string(BOX_WIDTH - 2, ' ') << "#";
+    }
+    gotoxy(x, y + BOX_HEIGHT - 1); std::cout << std::string(BOX_WIDTH, '#');
+
+    printCentered(2, "GAME OVER");
+    printCentered(4, message);
+    printCentered(6, "[R] Restart Level    [H] Main Menu");
+
+    while (true) {
+        if (_kbhit()) {
+            char key = _getch();
+            if (key == 'R' || key == 'r') { pendingRestart = true; return; }
+            else if (key == 'H' || key == 'h') { exitToMainMenu = true; return; }
+        }
+    }
+}
+
 
 void Game::update()
 {
@@ -489,66 +553,6 @@ void Game::goToScreen(ScreenId id)
     assignRiddlesToLevel();
 }
 
-void Game::restartCurrentLevel()
-{
-    ScreenId currentId = currentScreen->getScreenId();
-    for (auto obj : gameObjects) delete obj;
-    gameObjects.clear();
-    player1.restoreState();
-    player2.restoreState();
-
-    std::string filename;
-    switch (currentId) {
-    case ScreenId::ROOM1: filename = "Room1Screen.txt"; break;
-    case ScreenId::ROOM2: filename = "Room2Screen.txt"; break;
-    case ScreenId::ROOM3: filename = "Room3Screen.txt"; break;
-    default: filename = "Room1Screen.txt"; break;
-    }
-
-    screens[(int)currentId] = Screen(currentId);
-    LevelLoader::loadLevelFromFile(filename, screens[(int)currentId], gameObjects);
-
-    RiddleMode = false;
-    currentRiddle = nullptr;
-    currentRiddlePlayer = nullptr;
-    setStatusMessage("");
-    goToScreen(currentId);
-    assignRiddlesToLevel();
-}
-
-void Game::gameOverScreen(const std::string& message)
-{
-    playSound(100, 400);
-    system("cls");
-    const int BOX_WIDTH = 50;
-    const int BOX_HEIGHT = 9;
-    int x = (Screen::WIDTH - BOX_WIDTH) / 2;
-    int y = (Screen::HEIGHT - BOX_HEIGHT) / 2;
-
-    auto printCentered = [&](int rowOffset, const std::string& text) {
-        int padding = (BOX_WIDTH - 2 - (int)text.length()) / 2;
-        gotoxy(x, y + rowOffset);
-        std::cout << "#" << std::string(padding, ' ') << text << std::string(BOX_WIDTH - 2 - padding - text.length(), ' ') << "#";
-        };
-
-    gotoxy(x, y);     std::cout << std::string(BOX_WIDTH, '#');
-    for (int i = 1; i < BOX_HEIGHT - 1; ++i) {
-        gotoxy(x, y + i); std::cout << "#" << std::string(BOX_WIDTH - 2, ' ') << "#";
-    }
-    gotoxy(x, y + BOX_HEIGHT - 1); std::cout << std::string(BOX_WIDTH, '#');
-
-    printCentered(2, "GAME OVER");
-    printCentered(4, message);
-    printCentered(6, "[R] Restart Level    [H] Main Menu");
-
-    while (true) {
-        if (_kbhit()) {
-            char key = _getch();
-            if (key == 'R' || key == 'r') { pendingRestart = true; return; }
-            else if (key == 'H' || key == 'h') { exitToMainMenu = true; return; }
-        }
-    }
-}
 
 void Game::playSound(int frequency, int duration)
 {
@@ -781,6 +785,28 @@ void Game::explodeCell(int x, int y, Screen& screen)
             }
         }
     }
+}
+
+
+void Game::safeDeleteObject(GameObject* objToRemove)
+{
+    if (!objToRemove) return;
+
+    
+    if (player1.isHoldingItem(objToRemove)) player1.forceDropItem();
+    if (player2.isHoldingItem(objToRemove)) player2.forceDropItem();
+
+    
+    auto it = std::remove(gameObjects.begin(), gameObjects.end(), objToRemove);
+
+   
+    if (it == gameObjects.end()) {
+        throw GameException("Attempted to delete object not in gameObjects list!", "Game::safeDeleteObject");
+    }
+
+    gameObjects.erase(it, gameObjects.end());
+
+    delete objToRemove;
 }
 
 void Game::visualizeExplosion(int cx, int cy, int radius)

@@ -80,6 +80,8 @@ public:
     void setHudPosition(int x, int y) { hudX = x; hudY = y; }
     ScreenId getCurrentLevel() const { return currentLevel; }
     void setCurrentLevel(ScreenId id) { currentLevel = id; }
+    bool isHoldingItem(const GameObject* obj) const { return heldItem == obj; }
+    void forceDropItem() {heldItem = nullptr; } // Disconnect without triggering logic
 
     // Physics
     int getSpeed() const { return speed; }

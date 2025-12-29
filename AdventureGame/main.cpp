@@ -1,14 +1,12 @@
 ﻿#include "Game.h"
+#include "GameException.h" // <--- הוספה
 #include <iostream>
-#include <exception>
-#include <conio.h> // For _getch()
-#include <ctime>   // For time()
+#include <conio.h>
+#include <ctime>
 
 int main()
 {
-    // אתחול המספרים הרנדומליים פעם אחת בתחילת התוכנית
     srand((unsigned int)time(NULL));
-
     bool keepRunning = true;
 
     while (keepRunning)
@@ -17,26 +15,27 @@ int main()
         {
             Game game;
             game.start();
-            keepRunning = false;
+            keepRunning = false; 
+        }
+        catch (const GameException& e)
+        {
+            system("cls");
+            std::cerr << "\n======================================\n";
+            std::cerr << "         CRITICAL GAME ERROR          \n";
+            std::cerr << "======================================\n";
+            std::cerr << e.what() << "\n";
+            std::cerr << "======================================\n";
+            std::cerr << "\nPress any key to restart safely...";
+            _getch();
         }
         catch (const std::exception& e)
         {
             system("cls");
-            std::cerr << "\n\n   !!! CRITICAL ERROR !!!\n\n";
-            std::cerr << "   Error Details: " << e.what() << "\n\n";
-            std::cerr << "   Press any key to return to Main Menu and try again...";
+            std::cerr << "SYSTEM ERROR: " << e.what() << "\n";
+            std::cerr << "Press any key to exit...";
             _getch();
-        }
-        catch (...)
-        {
-           
-            system("cls");
-            std::cerr << "\n\n   !!! UNKNOWN ERROR !!!\n\n";
-            std::cerr << "   The game crashed due to an unexpected error.\n";
-            std::cerr << "   Press any key to restart...";
-            _getch();
+            return 1;
         }
     }
-
     return 0;
 }

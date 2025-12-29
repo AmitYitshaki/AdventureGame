@@ -127,6 +127,7 @@
     <ClInclude Include="Direction.h" />
     <ClInclude Include="Door.h" />
     <ClInclude Include="Game.h" />
+    <ClInclude Include="GameException.h" />
     <ClInclude Include="GameObject.h" />
     <ClInclude Include="Key.h" />
     <ClInclude Include="Laser.h" />
@@ -146,6 +147,7 @@
     <ClCompile Include="Bomb.cpp" />
     <ClCompile Include="Door.cpp" />
     <ClCompile Include="Game.cpp" />
+    <ClCompile Include="GameException.cpp" />
     <ClCompile Include="GameObject.cpp" />
     <ClCompile Include="Laser.cpp" />
     <ClCompile Include="LevelLoader.cpp" />

@@ -3,6 +3,7 @@
 #include <vector>
 #include "Screen.h"
 #include "GameObject.h"
+#include "GameException.h"
 
 class Laser;
 
