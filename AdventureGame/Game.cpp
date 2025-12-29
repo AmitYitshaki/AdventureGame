@@ -301,7 +301,9 @@ void Game::drawObjectsToBuffer(std::vector<std::string>& buffer)
 
 void Game::drawPlayersToBuffer(std::vector<std::string>& buffer)
 {
-    if (currentScreen->getScreenId() == ScreenId::HOME || currentScreen->getScreenId() == ScreenId::INSTRUCTIONS) return;
+    if (currentScreen->getScreenId() == ScreenId::HOME ||
+        currentScreen->getScreenId() == ScreenId::INSTRUCTIONS ||
+        currentScreen->getScreenId() == ScreenId::ROOM4) return;
     writeToBuffer(buffer, player1.getX(), player1.getY(), player1.getChar());
     writeToBuffer(buffer, player2.getX(), player2.getY(), player2.getChar());
 }
@@ -317,7 +319,9 @@ void Game::drawStatusMessageAt(std::vector<std::string>& buffer, int x, int y, i
 
 void Game::drawLegendToBuffer(std::vector<std::string>& buffer)
 {
-    if (currentScreen->getScreenId() == ScreenId::HOME || currentScreen->getScreenId() == ScreenId::INSTRUCTIONS) return;
+    if (currentScreen->getScreenId() == ScreenId::HOME ||
+        currentScreen->getScreenId() == ScreenId::INSTRUCTIONS ||
+        currentScreen->getScreenId() == ScreenId::ROOM4) return;
 
     int startX = player1.getHudX() - 1;
     int y = player1.getHudY();
@@ -458,7 +462,10 @@ int Game::getColorForChar(char c)
 int Game::resolveColor(char c, int x, int y)
 {
     if (!colorEnabled) return 7;
-    bool isMenu = (currentScreen->getScreenId() == ScreenId::HOME || currentScreen->getScreenId() == ScreenId::INSTRUCTIONS);
+    bool isMenu = (currentScreen->getScreenId() == ScreenId::HOME ||
+        currentScreen->getScreenId() == ScreenId::INSTRUCTIONS ||
+        currentScreen->getScreenId() == ScreenId::ROOM4); //final screen
+
     if (isMenu || (RiddleMode && currentRiddle != nullptr)) return 7;
 
     if (currentScreen->hasLegendDefined()) {
