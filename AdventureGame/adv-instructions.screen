@@ -14,12 +14,12 @@
 #    Direction continues until wall or STAY. No moving through walls.          #
 #                                                                              #
 #  Items:                                                                      #
-#    spring - launches the player ahead.                                       #
+#    spring - launches the player ahead when press STAY key                    #
 #    Keys - open matching doors ; torch - expands light in dark rooms.         #
 #    riddle - must to be PICKED UP by the players, wrong answer loses 1 life.  #
-#                                                                              #
+#    Bomx - explode 3 sec after droped, if players in range loses 1 life       #
 #  Pause/Home:                                                                 #
-#    ESC pauses; another ESC=continue, H= return to Home screen.               #
+#    ESC pauses; another ESC=continue, H= return to Home screen.(also here)    #
 #                                GOOD LUCK!                                    #
 #                                                                              #
 ################################################################################

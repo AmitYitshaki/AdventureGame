@@ -187,6 +187,7 @@ void Game::update()
         player1.stopMovement();
         player2.stopMovement();
         resetGame();
+        goToScreen(ScreenId::HOME);
         return;
     }
 
@@ -447,7 +448,7 @@ int Game::getColorForChar(char c)
     case '$': return 11; case '&': return 13; case '*': return 2;
     case 'K': return 14; case '!': return 12; case '-': case '|': return 4;
     case '/': case '\\': return 3;  case '?': return 9;
-    case 'W': case 'w': return 10; case 'D': return 6;
+    case 'W': case 'w':case '_': return 10; case 'D': return 6;
     case '0': case '1': case '2': case '3': case '4':
     case '5': case '6': case '7': case '8': case '9': return 6;
     default: return 7;
