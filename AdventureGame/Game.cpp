@@ -69,11 +69,6 @@ void Game::start()
         handleInput();
         update();
         draw();
-        gotoxy(0, Screen::HEIGHT + 1);
-        std::cout << "DEBUG LOG: "
-            << "P1(" << player1.getX() << "," << player1.getY() << ") "
-            << "P2(" << player2.getX() << "," << player2.getY() << ")      "
-            << std::endl;
         Sleep(TICK_MS);
     }
     cls();
