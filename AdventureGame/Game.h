@@ -127,7 +127,7 @@ public:
     static void setStatusMessage(const std::string& msg);
 
 private:
-    static constexpr int TICK_MS = 128;
+    static constexpr int TICK_MS = 64;
 
     Player player1;
     Player player2;

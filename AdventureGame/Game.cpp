@@ -69,6 +69,11 @@ void Game::start()
         handleInput();
         update();
         draw();
+        gotoxy(0, Screen::HEIGHT + 1);
+        std::cout << "DEBUG LOG: "
+            << "P1(" << player1.getX() << "," << player1.getY() << ") "
+            << "P2(" << player2.getX() << "," << player2.getY() << ")      "
+            << std::endl;
         Sleep(TICK_MS);
     }
     cls();
@@ -125,6 +130,7 @@ void Game::update()
         resetGame();
         return;
     }
+
 }
 
 void Game::handleInput()
@@ -173,7 +179,28 @@ void Game::handleInput()
     if (player2.isLoaded() && (key == 'k' || key == 'K')) {
         playSound(600, 50); player2.launch(player2.getLoadedSpringLen()); setStatusMessage(""); return;
     }
-
+/*   if (key == '9') {
+        system("cls");
+        std::cout << "=== OBSTACLE DEBUG REPORT ===" << std::endl;
+        int count = 0;
+        for (auto* obj : gameObjects) {
+            // בודק אם האובייקט הנוכחי הוא מכשול
+            if (auto* obs = dynamic_cast<Obstacle*>(obj)) {
+                // מסנן רק מכשולים במסך הנוכחי כדי לא להעמיס
+                if (obs->getScreenId() == currentScreen->getScreenId()) {
+                    count++;
+                    std::cout << "#" << count << " ";
+                    obs->printDebugInfo();
+                }
+            }
+        }
+        std::cout << "\nTotal Obstacles in Room: " << count << std::endl;
+        std::cout << "Press any key to continue...";
+        _getch(); 
+        draw(); 
+        return;
+    }
+*/
     ChangeDirection(key);
 
     if (key == 'E' || key == 'e') player1.dropItemToScreen(currentScreen->getScreenId());
@@ -774,5 +801,5 @@ void Game::visualizeExplosion(int cx, int cy, int radius)
         }
     }
     gotoxy(0, 0);
-    Sleep(150);
+    Sleep(2*TICK_MS);
 }

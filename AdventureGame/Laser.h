@@ -29,4 +29,5 @@ public:
     Laser(int x, int y, char c, ScreenId screen);
     void receiveSignal(bool state) override;
     bool handleCollision(Player& p, const Screen& screen) override;
+	bool isActive() const { return active; }
 };

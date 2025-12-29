@@ -73,6 +73,7 @@ public:
     int getY() const { return point.getY(); }
     char getChar() const { return point.getChar(); }
     Direction getDirection() const { return dir; }
+	Direction getLaunchDirection() const { return launchDirection; }
     void setDirection(Direction d) { dir = d; }
     int getHudX() const { return hudX; }
     int getHudY() const { return hudY; }
