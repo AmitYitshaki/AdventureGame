@@ -54,7 +54,7 @@ void Game::resetGame()
     LevelLoader::loadLevelFromFile("adv-world_03.screen", screens[(int)ScreenId::ROOM3], gameObjects);
 
     screens[(int)ScreenId::ROOM4] = Screen(ScreenId::ROOM4);
-    LevelLoader::loadLevelFromFile("adv-world_04.screen", screens[(int)ScreenId::ROOM4], gameObjects);
+    LevelLoader::loadScreenFromFile("adv-world_04.screen", screens[(int)ScreenId::ROOM4]);
     
     loadRiddlesFromFile("Riddles.txt");
     goToScreen(ScreenId::ROOM1);
@@ -84,7 +84,7 @@ void Game::restartCurrentLevel()
 
     std::string filename;
     switch (currentId) {
-    case ScreenId::ROOM1: filename = "adv-world_01.screen "; break;//adv-world_01.screen 
+    case ScreenId::ROOM1: filename = "adv-world_01.screen"; break;//adv-world_01.screen 
     case ScreenId::ROOM2: filename = "adv-world_02.screen"; break;
     case ScreenId::ROOM3: filename = "adv-world_03.screen"; break;
     case ScreenId::ROOM4: filename = "adv-world_04.screen"; break;

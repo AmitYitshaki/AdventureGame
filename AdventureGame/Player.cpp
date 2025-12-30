@@ -46,6 +46,7 @@ void Player::calculateMovementDelta(int& dx, int& dy) const
 
     if (isFlying())
     {
+        // 1. כיוון הבסיס של הקפיץ
         switch (launchDirection)
         {
         case Direction::UP:    dy = -1; break;
@@ -55,9 +56,22 @@ void Player::calculateMovementDelta(int& dx, int& dy) const
         default: break;
         }
 
-        // Steering while flying
-        if (dir == Direction::UP)    dy -= 1;
-        else if (dir == Direction::DOWN) dy += 1;
+        // 2. היגוי אוויר (Steering) - תיקון באג 1
+        // הוספנו תמיכה גם ב-LEFT ו-RIGHT
+        switch (dir)
+        {
+        case Direction::UP:    dy -= 1; break;
+        case Direction::DOWN:  dy += 1; break;
+        case Direction::LEFT:  dx -= 1; break; 
+        case Direction::RIGHT: dx += 1; break; 
+        default: break;
+        }
+
+        
+        if (dx > 1) dx = 1;
+        if (dx < -1) dx = -1;
+        if (dy > 1) dy = 1;
+        if (dy < -1) dy = -1;
     }
     else
     {
