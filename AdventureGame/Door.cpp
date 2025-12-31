@@ -4,6 +4,7 @@
 #include "Screen.h" 
 #include <iostream>
 #include <string>
+#include "Game.h" //for sound
 
 Door::Door(int x, int y, char c, ScreenId screen,
     int id, ScreenId leadsToScreen, bool isLocked)
@@ -31,6 +32,7 @@ bool Door::unlock(Player& player)
     {
         locked = false;
         player.removeHeldItem(); // Consume the key
+        Game::playSound(300, 200);
         return true;
     }
 

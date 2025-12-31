@@ -4,6 +4,7 @@
 #include <cstdlib>
 
 std::string Game::statusMessage = "";
+bool Game::soundEnabled = true; // Define static variable
 
 Game::Game()
     : player1(0, 0, '$', 16),
@@ -19,6 +20,19 @@ Game::~Game()
 {
     for (auto obj : gameObjects) delete obj;
     gameObjects.clear();
+}
+
+// === NEW: Non-Blocking Sound System ===
+bool Game::isSoundEnabled() { return soundEnabled; }
+
+void Game::playSound(int frequency, int duration)
+{
+    if (!soundEnabled) return;
+
+    // Run Beep in a separate thread so it doesn't freeze the game loop
+    std::thread([frequency, duration]() {
+        Beep(frequency, duration);
+        }).detach();
 }
 
 void Game::initGame()
@@ -45,7 +59,7 @@ void Game::resetGame()
     player2.resetStats();
 
     screens[(int)ScreenId::ROOM1] = Screen(ScreenId::ROOM1);
-    LevelLoader::loadLevelFromFile("adv-world_01.screen ", screens[(int)ScreenId::ROOM1], gameObjects);
+    LevelLoader::loadLevelFromFile("adv-world_01.screen", screens[(int)ScreenId::ROOM1], gameObjects);
 
     screens[(int)ScreenId::ROOM2] = Screen(ScreenId::ROOM2);
     LevelLoader::loadLevelFromFile("adv-world_02.screen", screens[(int)ScreenId::ROOM2], gameObjects);
@@ -55,10 +69,9 @@ void Game::resetGame()
 
     screens[(int)ScreenId::ROOM4] = Screen(ScreenId::ROOM4);
     LevelLoader::loadScreenFromFile("adv-world_04.screen", screens[(int)ScreenId::ROOM4]);
-    
+
     loadRiddlesFromFile("Riddles.txt");
     goToScreen(ScreenId::ROOM1);
-    
 }
 
 void Game::start()
@@ -84,12 +97,11 @@ void Game::restartCurrentLevel()
 
     std::string filename;
     switch (currentId) {
-    case ScreenId::ROOM1: filename = "adv-world_01.screen"; break;//adv-world_01.screen 
+    case ScreenId::ROOM1: filename = "adv-world_01.screen"; break;
     case ScreenId::ROOM2: filename = "adv-world_02.screen"; break;
     case ScreenId::ROOM3: filename = "adv-world_03.screen"; break;
     case ScreenId::ROOM4: filename = "adv-world_04.screen"; break;
     default: filename = "adv-world_01.screen"; break;
-
     }
 
     screens[(int)currentId] = Screen(currentId);
@@ -105,7 +117,7 @@ void Game::restartCurrentLevel()
 
 void Game::gameOverScreen(const std::string& message)
 {
-    playSound(100, 400);
+    playSound(100, 600); // Long low beep
     system("cls");
     const int BOX_WIDTH = 50;
     const int BOX_HEIGHT = 9;
@@ -137,6 +149,25 @@ void Game::gameOverScreen(const std::string& message)
     }
 }
 
+// === NEW: Garbage Collector to improve stability ===
+void Game::cleanupDeadObjects()
+{
+    auto it = gameObjects.begin();
+    while (it != gameObjects.end()) {
+        // Objects with position (-1, -1) are marked for deletion
+        if ((*it)->getX() == -1) {
+            // Safety: Ensure players aren't holding a pointer to the object we are about to delete
+            if (player1.isHoldingItem(*it)) player1.forceDropItem();
+            if (player2.isHoldingItem(*it)) player2.forceDropItem();
+
+            delete* it;
+            it = gameObjects.erase(it);
+        }
+        else {
+            ++it;
+        }
+    }
+}
 
 void Game::update()
 {
@@ -175,6 +206,9 @@ void Game::update()
 
     updateBombs();
 
+    // Clean up any objects destroyed this frame (Bombs, Keys, etc.)
+    cleanupDeadObjects();
+
     if (!pendingRestart && !exitToMainMenu) {
         if (player1.getLive() <= 0) gameOverScreen("Player 1 ran out of lives!");
         else if (player2.getLive() <= 0) gameOverScreen("Player 2 ran out of lives!");
@@ -194,7 +228,6 @@ void Game::update()
         goToScreen(ScreenId::HOME);
         return;
     }
-
 }
 
 void Game::handleInput()
@@ -208,7 +241,11 @@ void Game::handleInput()
     }
 
     if (currentScreen == &screens[(int)ScreenId::HOME]) {
-        if (key == '1') { resetGame(); return; }
+        if (key == '1') {
+            playSound(600, 100); // Start Game Sound
+            resetGame();
+            return;
+        }
         if (key == '2') { goToScreen(ScreenId::INSTRUCTIONS); return; }
         if (key == '3') { end(); return; }
         if (key == 'c' || key == 'C') {
@@ -236,28 +273,7 @@ void Game::handleInput()
     }
 
     if (key == 27) { pauseScreen(); return; }
-/*   if (key == '9') {
-        system("cls");
-        std::cout << "=== OBSTACLE DEBUG REPORT ===" << std::endl;
-        int count = 0;
-        for (auto* obj : gameObjects) {
-            // בודק אם האובייקט הנוכחי הוא מכשול
-            if (auto* obs = dynamic_cast<Obstacle*>(obj)) {
-                // מסנן רק מכשולים במסך הנוכחי כדי לא להעמיס
-                if (obs->getScreenId() == currentScreen->getScreenId()) {
-                    count++;
-                    std::cout << "#" << count << " ";
-                    obs->printDebugInfo();
-                }
-            }
-        }
-        std::cout << "\nTotal Obstacles in Room: " << count << std::endl;
-        std::cout << "Press any key to continue...";
-        _getch(); 
-        draw(); 
-        return;
-    }
-*/
+
     ChangeDirection(key);
 
     if (key == 'E' || key == 'e') player1.dropItemToScreen(currentScreen->getScreenId());
@@ -461,7 +477,7 @@ int Game::resolveColor(char c, int x, int y)
     if (!colorEnabled) return 7;
     bool isMenu = (currentScreen->getScreenId() == ScreenId::HOME ||
         currentScreen->getScreenId() == ScreenId::INSTRUCTIONS ||
-        currentScreen->getScreenId() == ScreenId::ROOM4); //final screen
+        currentScreen->getScreenId() == ScreenId::ROOM4);
 
     if (isMenu || (RiddleMode && currentRiddle != nullptr)) return 7;
 
@@ -515,6 +531,10 @@ void Game::checkLevelTransition()
     }
 
     if (t1 != real && t2 != real && t1 == t2) {
+        playSound(523, 100); // Level Complete Chime (C)
+        playSound(659, 100); // (E)
+        playSound(784, 200); // (G)
+
         setStatusMessage("Level Complete! +200");
         player1.addScore(100);
         player2.addScore(100);
@@ -558,13 +578,6 @@ void Game::goToScreen(ScreenId id)
     assignRiddlesToLevel();
 }
 
-
-void Game::playSound(int frequency, int duration)
-{
-    if (!soundEnabled) return;
-    Beep(frequency, duration);
-}
-
 void Game::ChangeDirection(char c)
 {
     if (c == 'w' || c == 'W') player1.setDirection(Direction::UP);
@@ -582,7 +595,6 @@ void Game::ChangeDirection(char c)
 
 void Game::handleRiddleInput(char key)
 {
-    // תיקון 1: שימוש ישיר במשתנה currentRiddlePlayer
     if (!currentRiddle || !currentRiddlePlayer) return;
 
     if (key < '1' || key > '4') { setStatusMessage("Press 1-4"); return; }
@@ -591,17 +603,19 @@ void Game::handleRiddleInput(char key)
     Player& p = *currentRiddlePlayer;
 
     if (selected == currentRiddle->getCorrectAnswer()) {
+        playSound(1000, 100); // Correct Sound
+        playSound(1200, 100);
         setStatusMessage("Correct! +100 Points");
 
-        // תיקון 2: שימוש ישיר להוספת ניקוד
         currentRiddlePlayer->addScore(100);
+        currentRiddle->removeFromGame();
 
-        p.removeHeldItem();
         RiddleMode = false;
         currentRiddle = nullptr;
         currentRiddlePlayer = nullptr;
     }
     else {
+        playSound(200, 300); // Error Sound
         p.decreaseLife();
         setStatusMessage("Wrong! You lost a life.");
         draw();
@@ -723,7 +737,7 @@ void Game::updateBombs()
         if (!bomb || bomb->getScreenId() != curr_screen) continue;
 
         if (bomb->tick()) {
-            playSound(150, 150);
+            playSound(150, 150); // Now async!
             Point c = bomb->getPoint();
             int radius = Bomb::getExplosionRadius();
             visualizeExplosion(c.getX(), c.getY(), radius);
@@ -789,22 +803,15 @@ void Game::explodeCell(int x, int y, Screen& screen)
 
 void Game::safeDeleteObject(GameObject* objToRemove)
 {
+    // Deprecated in favor of cleanupDeadObjects, but kept for legacy
     if (!objToRemove) return;
-
-    
     if (player1.isHoldingItem(objToRemove)) player1.forceDropItem();
     if (player2.isHoldingItem(objToRemove)) player2.forceDropItem();
 
-    
     auto it = std::remove(gameObjects.begin(), gameObjects.end(), objToRemove);
-
-   
-    if (it == gameObjects.end()) {
-        throw GameException("Attempted to delete object not in gameObjects list!", "Game::safeDeleteObject");
-    }
+    if (it == gameObjects.end()) return;
 
     gameObjects.erase(it, gameObjects.end());
-
     delete objToRemove;
 }
 
@@ -821,5 +828,5 @@ void Game::visualizeExplosion(int cx, int cy, int radius)
         }
     }
     gotoxy(0, 0);
-    Sleep(2*TICK_MS);
+    Sleep(2 * TICK_MS);
 }

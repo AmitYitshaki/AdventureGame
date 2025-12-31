@@ -11,7 +11,7 @@ of Exercise 2. We request bonus points for the following:
      Implemented a full color system for better UX (Green springs, Red bombs, etc.).
      Includes a menu option to toggle colors ON/OFF as required for the bonus.
    * Sound Effects:
-     Added audio cues (using Windows Beep) for Spring launch, and bomb explosions(if more sounds are needed for 	Bonus please mention and we will add for: collecting items, changing room's loosing a life,riddle and so on. (did not want to exaggerate)
+     Added audio cues (using Windows Beep) for Spring launch, and bomb explosions, collecting items, changing room's loosing a life,riddle and so on.
      Includes a menu option to toggle sound ON/OFF.
    * Visual Bomb Countdown:
      Bombs display a visual countdown timer ('3' -> '2' -> '1') on the board 

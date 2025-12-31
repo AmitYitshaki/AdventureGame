@@ -218,6 +218,7 @@ void Player::startSpringEffect(int springLength)
     speed = springLength;
     force = springLength;
     dir = launchDirection;
+    Game::playSound(400 + (springLength *50), 150);
 }
 
 void Player::updateSpringEffect()
@@ -249,6 +250,7 @@ bool Player::collectItem(GameObject* item)
         item->Collected();
         item->setPosition(hudX + 13, hudY);
         Game::setStatusMessage(std::string("Collected item '") + item->getChar() + "'");
+        Game::playSound(800, 50);
         return true;
     }
     return false;

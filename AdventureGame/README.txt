@@ -8,7 +8,7 @@ Student id: 322819483 Amit Yitshaki, 208296715 Niv Katz
 The project implements ALL required game elements as defined in Exercise 2:
 1. Two Players: Independent movement and controls.
 2. Static Elements: Walls ('#').
-3. Interactive Items: Keys, Doors (1-9), Springs, Bombs, Switches, Obstacles.
+3. Interactive Items: Keys, Doors (1-9), Springs, Bombs, Switches - Laser, Obstacles.
 4. Collectibles: Torch (lighting) and Riddle (logic puzzle).
 5. Architecture: The solution strictly avoids recursion and manages memory safely.
 
@@ -96,5 +96,6 @@ AI tools (CoPilot/ChatGPT/Gemini) were used for development support:
 - Designing ASCII art for the Victory/Start screens.
 - Refactoring code into the `LevelLoader` and `GameException` classes.
 - Shuffle Riddles. 
+- Sound system.
 
 All code was manually reviewed, integrated, and tested by us.

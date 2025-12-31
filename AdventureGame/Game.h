@@ -12,6 +12,7 @@
 #include <sstream>
 #include <windows.h>
 #include <memory> 
+#include <thread> // <--- ADDED for non-blocking sound
 
 // =============================================================
 //                     PROJECT INCLUDES
@@ -37,38 +38,19 @@
 #include "Switch.h"
 #include "Laser.h"
 
-/*
- * ===================================================================================
- * Class: Game
- * -----------------------------------------------------------------------------------
- * Purpose:
- * The central engine/controller of the application. It manages the main game loop,
- * game state, rendering pipeline, and input processing.
- *
- * Behavior:
- * - Initializes the game world and loads levels.
- * - Runs the "Game Loop" (Input -> Update -> Draw).
- * - Manages transitions between screens (Levels, Home, Instructions).
- * - Handles global systems like Lighting, HUD, and Message Logs.
- *
- * Implementation:
- * - Holds the instances of Player1 and Player2.
- * - Maintains an array of 'Screen' objects representing the world map.
- * - Uses a double-buffer approach (via std::vector<string>) for flicker-free rendering.
- * ===================================================================================
- */
-
 class Game
 {
 public:
     Game();
     ~Game();
 
-    // מניעת העתקה (Singleton-like behavior)
     Game(const Game&) = delete;
     Game& operator=(const Game&) = delete;
 
     void start();
+
+    // Made public static so other classes (Player, Door) can trigger sounds easily
+    static void playSound(int frequency, int duration);
 
 private:
     // --- Core Loop ---
@@ -78,6 +60,9 @@ private:
     void initGame();
     void resetGame();
     void end() { isRunning = false; }
+
+    // --- Memory Management ---
+    void cleanupDeadObjects(); // <--- NEW: Garbage Collector
 
     // --- UI Helpers ---
     std::vector<std::string> initBuffer();
@@ -98,13 +83,12 @@ private:
     void toggleColor() { colorEnabled = !colorEnabled; }
     void toggleSound() { soundEnabled = !soundEnabled; }
     bool isColorEnabled() const { return colorEnabled; }
-    bool isSoundEnabled() const { return soundEnabled; }
+    static bool isSoundEnabled(); 
     void setConsoleColor(int colorCode);
     int getColorForChar(char c);
     int resolveColor(char c, int x, int y);
 
     // --- Logic & Mechanics ---
-    void playSound(int frequency, int duration);
     void ChangeDirection(char c);
     void handleRiddleInput(char key);
     void stopMovement();
@@ -146,7 +130,7 @@ private:
     bool exitToMainMenu = false;
     bool pendingRestart = false;
     bool colorEnabled = true;
-    bool soundEnabled = true;
+    static bool soundEnabled; // Changed to static
 
     static std::string statusMessage;
 };
