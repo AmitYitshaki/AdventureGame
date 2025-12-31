@@ -58,6 +58,9 @@ public:
     Riddle* getHeldRiddle() const;
     int getHeldKeyID() const;
     char getItemChar() const;
+    void setInteractingRiddle(Riddle* r) { activeInteractionRiddle = r; }
+    Riddle* getInteractingRiddle() const { return activeInteractionRiddle; }
+    void clearInteractingRiddle() { activeInteractionRiddle = nullptr; }
 
     // Stats
     int getLive() const { return live; }
@@ -118,6 +121,7 @@ private:
 
     GameObject* heldItem = nullptr;
     ScreenId currentLevel = ScreenId::ROOM1;
+    Riddle* activeInteractionRiddle = nullptr;
 
     int savedLife = 3;
     int savedScore = 0;

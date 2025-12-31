@@ -109,7 +109,8 @@ bool Spring::handleCollision(Player& p, const Screen& screen)
         return true;
     }
 
-    if (p.getDirection() != oppositeDir && p.getDirection() != Direction::STAY) {
+    Direction pDir = p.getDirection();
+    if (pDir != oppositeDir && pDir != Direction::STAY) {
         return false;
     }
 
@@ -117,17 +118,20 @@ bool Spring::handleCollision(Player& p, const Screen& screen)
 
     if (hitIndex == 0) {
         for (auto& pt : parts) pt.setChar('_');
-        loadSpring(p);
+        p.setLaunchDirection(direction);
+        p.launch((int)parts.size());
+        return true;
     }
-    return true;
-}
 
-void Spring::loadSpring(Player& p)
-{
-    p.stopMovement();
-    p.setLoaded(true);
-    p.setLaunchDirection(direction);
-    p.setLoadedSpringLen((int)parts.size());
+    if (pDir == Direction::STAY) {
+        p.setLaunchDirection(direction);
+        int power = (int)parts.size() - hitIndex;
+        if (power < 2) power = 2;
+        p.launch(power);
+        return true;
+    }
+
+    return true;
 }
 
 bool Spring::handleExplosionAt(int x, int y)

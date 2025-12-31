@@ -1,102 +1,100 @@
 Student id: 322819483 Amit Yitshaki, 208296715 Niv Katz
 
-Implemented Elements (Assignment Requirements)
+=============================================================
+              ADVENTURE GAME - PROJECT SUMMARY
+=============================================================
 
-The project includes all mandatory components:
+--- Implemented Elements ---
+The project implements ALL required game elements as defined in Exercise 2:
+1. Two Players: Independent movement and controls.
+2. Static Elements: Walls ('#').
+3. Interactive Items: Keys, Doors (1-9), Springs, Bombs, Switches, Obstacles.
+4. Collectibles: Torch (lighting) and Riddle (logic puzzle).
+5. Architecture: The solution strictly avoids recursion and manages memory safely.
 
-Two players/Walls/Keys/Doors
+--- Architecture Summary ---
+* Game:
+  The central engine. Manages the game loop, double-buffered rendering,
+  screen transitions, input handling, and global state.
 
-Three screens: two playable rooms and a final victory screen.
+* Player:
+  A standalone class (does NOT inherit from GameObject) representing the users.
+  Manages physics, inventory, life, score, and movement logic.
 
-Springs with full compression, loading, and launch behavior according to specification
+* GameObject (Base Class):
+  Base class for all interactive entities on the board.
+  Derived classes: Bomb, Switch, Laser, Spring, Door, Key, Obstacle, Riddle.
+  Note: Static walls are managed by the Screen class, not as GameObjects.
 
-Two optional items implemented: Torch and Riddle.
+* LevelLoader (Static):
+  A dedicated utility class for parsing `.screen` files. It handles both
+  ASCII map generation and complex metadata parsing.
 
-The project follows all structural requirements and avoids recursion.
+--- Game Mechanics: Springs ---
+* Independence: Springs are logical objects that function independently of walls.
+* Visuals: Springs compress visually ('W' -> 'w' -> '_') when stepped on.
+* Loading: When a player reaches the spring's base (the last segment), they become "Loaded".
+* Launching: A loaded player CANNOT move. They must press 'STAY' to release the spring.
+* Flight: Launch power depends on spring length.
 
-Architecture Summary
+--- Room Descriptions (Level Design) ---
+The game includes 4 distinct screens demonstrating different mechanics:
 
-Main modules:
+1. Room 1 - "The Playroom":
+   A relatively simple introductory level. Introduces basic mechanics like
+   keys, doors, and springs in a bright, open space.
 
-Game:
-Handles the update loop, rendering (double-buffered), input, screen transitions,
-pause menu, and full "New Game" reset functionality.
+2. Room 2 - "The Dark Maze":
+   A complex maze level with "Dark Mode" enabled. Players must use Torches
+   to navigate and find the exit, relying on memory and limited visibility.
 
-Player:
-Controls movement, spring-affected flight, lives, inventory, HUD position, and states
-related to spring loading and flying.
+3. Room 3 - "Teamwork Hall":
+   A puzzle-heavy level designed around cooperation. Requires players to
+   coordinate switch toggles and obstacle pushing to progress.
 
-GameObject (base class):
-Provides polymorphic behavior for objects such as Door, Key, Torch, Riddle, Spring.
-Each derived object implements its own collision logic.
+4. Room 4 - "Victory Screen":
+   A celebration screen displaying the final status and offering a restart.
 
-Screen:
-Stores the layout of each room, identifies walls, and supports dark-room mode.
+* Dynamic Legend: The HUD (Legend) position changes between levels to demonstrate
+  flexibility. It is intentionally compact to maximize playable area.
 
-Lighting System:
-Distance-based visibility; Torch increases the light radius.
+--- LEVEL DESIGN GUIDE: How to Add New Screens ---
+To extend the game with new levels, follow these 4 steps:
 
-Point / Utils:
-Responsible for console cursor control, coordinate handling, and drawing characters.
+STEP 1: Create the File
+   - Create a new text file named `adv-world_XX.screen` (e.g., `adv-world_05.screen`).
+   - Ensure the file is 25 lines high and 80 characters wide.
 
-Spring Mechanics (Implemented Behavior)
+STEP 2: Draw the Map (ASCII Art)
+   - Use '#' for Walls.
+   - Use '$' for Player 1 start pos, '&' for Player 2.
+   - Use ' ' (Space) for empty floor.
+   - Objects: 'K'=Key, '@'=Bomb, 'W'=Spring, '?'=Riddle, '/'=Switch.
+   - Doors: Use digits '1'-'9' (The char 'D' is NOT used for doors).
+   - Legend Area: Place 'L' at the top-left of the status bar area.
 
-The spring consists of three aligned segments next to a wall.
+STEP 3: Add Metadata (Below the map)
+   Only complex objects need metadata. Bombs, Obstacles, and Riddles DO NOT need metadata.
+   Add commands at the bottom of the file:
+   - Door:    DOOR_DATA <x> <y> <id> <target_screen_id> <is_locked(0/1)>
+   - Key:     KEY_DATA <x> <y> <id>
+   - Spring:  SPRING_DATA <x> <y> <direction(U/D/L/R)> <screen_id> <length>
+   - Connect: CONNECT <switch_x> <switch_y> <target_x> <target_y>
+   - Dark:    Add the word "DARK" to make the room require a torch.
 
-Compression occurs only when the player enters from the opposite direction of release.
+STEP 4: Update the Code (Game.cpp)
+   - Add a `LevelLoader::loadLevelFromFile(...)` call in `resetGame`.
+   - Update the switch-case in `restartCurrentLevel`.
+   - Add the new enum value to `ScreenID.h`.
+   
+ --- AI Assistance Declaration ---
+AI tools (CoPilot/ChatGPT/Gemini) were used for development support:
+- Generating initial class skeletons (Getters/Setters).
+- Assisting with the double-buffer rendering logic.
+- Debugging complex collision edge-cases (specifically Spring & Obstacle physics).
+- Writing the README and documentation.
+- Designing ASCII art for the Victory/Start screens.
+- Refactoring code into the `LevelLoader` and `GameException` classes.
+- Shuffle Riddles. 
 
-During compression, segments visually collapse by changing their character to '_'.
-
-When the player reaches the final segment, the spring becomes "loaded":
-power = spring length
-duration = power * power
-
-Pressing STAY launches the player in the release direction.
-
-Vertical drift (up/down) is allowed during flight.
-
-Any collision with a wall or blocking object stops the launch immediately.
-
-Momentum transfer to the second player upon collision was not implemented yet!
-
-Riddle Behavior
-
-The riddle is implemented as a collectible item.
-
-Stepping on it adds the riddle to the player's inventory.
-
-The game detects that a player carries a riddle and enters "Riddle Mode".
-
-Only answers 1–4 are accepted.
-
-A wrong answer reduces one life; a correct answer removes the riddle.
-
-Character Choices (Documented Deviation)
-Wall character used: '#'
-Spring characters used: 'W' and 'w'
-
-New Game Reset
-
-Selecting "New Game" performs a full reset:
-
-Use of AI Assistance
-
-AI tools(coPilot/ChatGpt/Gemini) were used only for development support.
-The following contributions were made:
-Get and Set functions (just because its basic)
-
-Assisted with designing and wiritng the double-buffer drawing mechanism.
-
-Helped derive the formulas and logic used in the Torch lighting system.
-
-made HomeScreen and final Screen artwork
-
-Helped organize the code by grouping and reordering functions into a logical structure.
-
-Ensured consistent English comments throughout the project.
-
-Helped resolve a complex collision-handling issue in the Spring object.
-
-Helped writing README file :)
-
-All code was reviewed manually and integrated responsibly. 
+All code was manually reviewed, integrated, and tested by us.

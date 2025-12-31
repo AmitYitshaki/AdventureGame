@@ -3,11 +3,7 @@
 
 bool Riddle::handleCollision(Player& p, const Screen&)
 {
-    if (isCollected()) return true;
-    if (p.hasItem()) return false;
-
-    p.collectItem(this);
-    Collected();
-    removeFromGame();
+    if (solved) return true;
+    p.setInteractingRiddle(this);
     return true;
 }

@@ -162,11 +162,15 @@ void Game::update()
         checkLevelTransition();
     }
 
-    checkIsPlayerLoaded();
-
-    if (!RiddleMode && checkPlayerHasRiddle()) {
-        if (player1.hasRiddle()) startRiddle(player1.getHeldRiddle(), player1);
-        else if (player2.hasRiddle()) startRiddle(player2.getHeldRiddle(), player2);
+    if (!RiddleMode) {
+        if (player1.getInteractingRiddle() != nullptr) {
+            startRiddle(player1.getInteractingRiddle(), player1);
+            player1.clearInteractingRiddle();
+        }
+        else if (player2.getInteractingRiddle() != nullptr) {
+            startRiddle(player2.getInteractingRiddle(), player2);
+            player2.clearInteractingRiddle();
+        }
     }
 
     updateBombs();
@@ -232,13 +236,6 @@ void Game::handleInput()
     }
 
     if (key == 27) { pauseScreen(); return; }
-
-    if (player1.isLoaded() && (key == 's' || key == 'S')) {
-        playSound(600, 50); player1.launch(player1.getLoadedSpringLen()); setStatusMessage(""); return;
-    }
-    if (player2.isLoaded() && (key == 'k' || key == 'K')) {
-        playSound(600, 50); player2.launch(player2.getLoadedSpringLen()); setStatusMessage(""); return;
-    }
 /*   if (key == '9') {
         system("cls");
         std::cout << "=== OBSTACLE DEBUG REPORT ===" << std::endl;
@@ -620,12 +617,6 @@ void Game::stopMovement()
 {
     player1.setDirection(Direction::STAY);
     player2.setDirection(Direction::STAY);
-}
-
-void Game::checkIsPlayerLoaded()
-{
-    if (player1.isLoaded() || player2.isLoaded())
-        setStatusMessage("Spring ready! Press STAY.");
 }
 
 bool Game::checkPlayerHasRiddle()

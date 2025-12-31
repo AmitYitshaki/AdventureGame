@@ -149,7 +149,24 @@ void Player::move(Screen& screen, std::vector<GameObject*>& gameObjects, Player*
     int dx = 0, dy = 0;
     calculateMovementDelta(dx, dy);
 
-    if (dx == 0 && dy == 0) return;
+    if (dx == 0 && dy == 0)
+    {
+        bool onSpring = false;
+        for (auto obj : gameObjects)
+        {
+            if (obj->getScreenId() != currentLevel || obj->isCollected()) continue;
+
+            if (obj->isAtPosition(point.getX(), point.getY()))
+            {
+                if (dynamic_cast<Spring*>(obj)) {
+                    onSpring = true;
+                    break;
+                }
+            }
+        }
+
+        if (!onSpring) return;
+    }
 
     Point nextPos(point.getX() + dx, point.getY() + dy, ' ');
 
@@ -159,7 +176,6 @@ void Player::move(Screen& screen, std::vector<GameObject*>& gameObjects, Player*
         {
             if (isFlying())
             {
-                // Momentum transfer logic
                 otherPlayer->setLaunchDirection(this->dir);
                 otherPlayer->startSpringEffect(this->speed);
                 this->stopSpringEffect();
@@ -181,7 +197,7 @@ void Player::move(Screen& screen, std::vector<GameObject*>& gameObjects, Player*
 
     if (!handleObjectInteractions(screen, gameObjects, otherPlayer))
     {
-        point.move(-dx, -dy); // Undo move
+        point.move(-dx, -dy);
 
         if (isFlying()) {
             stopSpringEffect();

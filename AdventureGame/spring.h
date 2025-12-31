@@ -47,8 +47,6 @@ private:
     std::vector<Point> parts;
     Direction direction;
     Direction oppositeDir;
-
-    void loadSpring(Player& p);
     static void getDelta(Direction d, int& dx, int& dy);
     static Direction oppositeDirection(Direction d);
 };
