@@ -21,11 +21,13 @@ bool Laser::handleCollision(Player& p, const Screen& screen)
 }
 
 std::string Laser::getTypeName() const { return "LASER"; }
+
 std::string Laser::getSaveData() const {
-    // Format: X Y OriginalSymbol
-    // Note: Active state depends on Switch, but we save original char to restore correctly
+    // Format: X Y OriginalSymbol Active(1/0)
     std::string s = GameObject::getSaveData();
     s += " ";
     s += originalSymbol;
+    s += " ";
+    s += (active ? "1" : "0"); // שומרים גם את המצב הנוכחי!
     return s;
 }

@@ -52,4 +52,5 @@ public:
     std::string getTypeName() const override { return "RIDDLE"; }
     // Riddle typically handles its own internal data via ID, 
     // assuming we don't need to save 'solved' state if it disappears when solved.
+    std::string getSaveData() const override;
 };

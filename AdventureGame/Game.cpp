@@ -125,8 +125,21 @@ void Game::start()
 void Game::restartCurrentLevel()
 {
     ScreenId currentId = currentScreen->getScreenId();
-    for (auto obj : gameObjects) delete obj;
-    gameObjects.clear();
+
+    // --- התיקון: מחיקה סלקטיבית ---
+    // אנחנו מוחקים רק אובייקטים ששייכים לחדר שאותו אנחנו מאתחלים
+    auto it = gameObjects.begin();
+    while (it != gameObjects.end()) {
+        if ((*it)->getScreenId() == currentId) {
+            delete* it;                 // שחרור זיכרון
+            it = gameObjects.erase(it); // הוצאה מהרשימה
+        }
+        else {
+            ++it; // אובייקטים מחדרים אחרים נשארים בטוחים
+        }
+    }
+    // -----------------------------
+
     player1.restoreState();
     player2.restoreState();
 
@@ -139,7 +152,10 @@ void Game::restartCurrentLevel()
     default: filename = "adv-world_01.screen"; break;
     }
 
+    // יצירת המסך מחדש
     screens[(int)currentId] = Screen(currentId);
+
+    // טעינת האובייקטים (זה יוסיף אותם לסוף הרשימה, אחרי האובייקטים של החדרים האחרים)
     LevelLoader::loadLevelFromFile(filename, screens[(int)currentId], gameObjects);
 
     RiddleMode = false;
@@ -752,6 +768,15 @@ bool Game::checkPlayerHasRiddle()
     return player1.hasRiddle() || player2.hasRiddle();
 }
 
+const RiddleData* Game::getRiddleDataById(int id) const {
+    for (const auto& rData : riddlesPool) {
+        if (rData.id == id) {
+            return &rData;
+        }
+    }
+    return nullptr;
+}
+
 void Game::startRiddle(Riddle* riddle, Player& p)
 {
     if (!riddle) return;
@@ -1053,33 +1078,57 @@ void Game::checkPlaybackStatus()
 GameObject* Game::createObjectFromSave(const std::string& type, std::stringstream& ss)
 {
     int x, y;
-    ss >> x >> y; // Always read Position first
+    ss >> x >> y; // Always read position first (saved by GameObject base class)
 
-    if (type == "BOMB") {
-        int active, ticks;
-        ss >> active >> ticks;
-        Bomb* b = new Bomb(x, y, currentScreen->getScreenId());
-        if (active) b->activate(); // You might need a method to set specific ticks
-        return b;
+    if (type == "LASER") {
+        char original;
+        int activeInt;
+        // Read original char and active state (0 or 1)
+        ss >> original >> activeInt;
+
+        Laser* l = new Laser(x, y, original, currentScreen->getScreenId());
+
+        // Restore state: if saved as 0 (inactive), simulate a signal to turn it off
+        if (activeInt == 0) l->receiveSignal(true);
+        return l;
     }
-    else if (type == "KEY") {
-        int id; ss >> id;
-        return new Key(x, y, 'K', currentScreen->getScreenId(), id);
+    else if (type == "SWITCH") {
+        int active, count;
+        ss >> active >> count; // Read state and number of targets
+
+        Switch* s = new Switch(x, y, currentScreen->getScreenId());
+        if (active) s->toggle(); // Restore active state
+
+        // Note: Target coordinates are left in the stream and handled in loadGameState
+        return s;
     }
     else if (type == "DOOR") {
         int id, target, locked;
         ss >> id >> target >> locked;
-        return new Door(x, y, 'D', currentScreen->getScreenId(), id, (ScreenId)target, locked);
+
+        // התיקון הגדול: נרמול ה-ID לתצוגה
+        // אם ה-ID הוא 100, נחלק ב-100 ונקבל 1 -> יהפוך לתו '1'
+        // אם ה-ID הוא 300, נחלק ב-100 ונקבל 3 -> יהפוך לתו '3'
+        int visualDigit = id;
+        if (visualDigit >= 100) {
+            visualDigit /= 100;
+        }
+
+        char doorSymbol = (char)('0' + visualDigit);
+
+        return new Door(x, y, doorSymbol, currentScreen->getScreenId(), id, (ScreenId)target, locked);
     }
-    else if (type == "SWITCH") {
-        int active; ss >> active;
-        Switch* s = new Switch(x, y, currentScreen->getScreenId());
-        if (active) s->toggle(); // Or set active manually
-        return s;
+    else if (type == "KEY") {
+        int id;
+        ss >> id;
+        return new Key(x, y, 'K', currentScreen->getScreenId(), id);
     }
-    else if (type == "LASER") {
-        char original; ss >> std::noskipws >> original >> std::skipws; // Read char safely
-        return new Laser(x, y, original, currentScreen->getScreenId());
+    else if (type == "BOMB") {
+        int active, ticks;
+        ss >> active >> ticks;
+        Bomb* b = new Bomb(x, y, currentScreen->getScreenId());
+        if (active) b->activate(); // Restore bomb timer if it was ticking
+        return b;
     }
     else if (type == "TORCH") {
         return new Torch(x, y, 'T', currentScreen->getScreenId());
@@ -1087,23 +1136,43 @@ GameObject* Game::createObjectFromSave(const std::string& type, std::stringstrea
     else if (type == "SPRING") {
         char dirC; int target, len;
         ss >> dirC >> target >> len;
+
+        // Map char to Direction enum
         Direction d = Direction::UP;
         if (dirC == 'D') d = Direction::DOWN;
         else if (dirC == 'L') d = Direction::LEFT;
         else if (dirC == 'R') d = Direction::RIGHT;
+
         return new Spring(Point(x, y, 'W'), d, (ScreenId)target, len);
     }
     else if (type == "OBSTACLE") {
-        int count; ss >> count;
+        int count;
+        ss >> count;
         std::vector<Point> tiles;
         for (int i = 0; i < count; ++i) {
-            int px, py; ss >> px >> py;
+            int px, py;
+            ss >> px >> py;
             tiles.push_back(Point(px, py, '*'));
         }
         return new Obstacle(tiles, currentScreen->getScreenId());
     }
     else if (type == "RIDDLE") {
-        return new Riddle(x, y, currentScreen->getScreenId());
+        int riddleId;
+        ss >> riddleId; // קריאת ה-ID ששמרנו
+
+        Riddle* newRiddle = new Riddle(x, y, currentScreen->getScreenId());
+
+        // אם יש ID תקין, אנחנו מחפשים את השאלה במאגר ומכניסים אותה לאובייקט
+        if (riddleId != -1) {
+            const RiddleData* foundData = getRiddleDataById(riddleId);
+            if (foundData) {
+                newRiddle->setData(*foundData);
+            }
+        }
+        // אם לא מצאנו (או שה-ID הוא -1), החידה תישאר ריקה ונטפל בה 
+        // אולי בפונקציה אחרת, אבל לרוב בשמירה יש כבר חידה פעילה.
+
+        return newRiddle;
     }
 
     return nullptr;
@@ -1114,26 +1183,24 @@ void Game::saveGameState(const std::string& filename)
     std::ofstream file(filename);
     if (!file) throw GameException("Failed to create save file", "Game::saveGameState");
 
-    // 1. Save Global State
     file << "SCREEN_ID " << (int)currentScreen->getScreenId() << std::endl;
     file << "SEED " << randomSeed << std::endl;
     file << "CYCLE " << cycleCounter << std::endl;
 
-    // 2. Save Map Layout (Walls/Floor - preserving explosions)
     file << "MAP_LAYOUT" << std::endl;
     for (const auto& line : currentScreen->getLayout()) {
         file << line << std::endl;
     }
     file << "END_MAP" << std::endl;
 
-    // 3. Save Players (Includes logic to save Held Item Coordinates)
-    file << player1.getSaveData(1) << std::endl;
-    file << player2.getSaveData(2) << std::endl;
+    // === תיקון בעיית המעבר בדלת ===
+    // אנחנו שומרים ידנית את ה-ScreenID של כל שחקן ליד המידע שלו
+    file << player1.getSaveData(1) << " " << (int)player1.getCurrentLevel() << std::endl;
+    file << player2.getSaveData(2) << " " << (int)player2.getCurrentLevel() << std::endl;
 
-    // 4. Save All Living Objects
     file << "OBJECTS_START" << std::endl;
     for (auto obj : gameObjects) {
-        // Only save objects that belong to the current screen
+        // שומרים רק אובייקטים של המסך הנוכחי (לפי השיטה שלך)
         if (obj->getScreenId() == currentScreen->getScreenId()) {
             file << obj->getTypeName() << " " << obj->getSaveData() << std::endl;
         }
@@ -1143,60 +1210,91 @@ void Game::saveGameState(const std::string& filename)
     file.close();
 }
 
+// מבנה עזר לחיבור מתגים (בתוך Game.cpp, לפני loadGameState)
+struct PendingSwitch {
+    Switch* s;
+    std::vector<std::pair<int, int>> targets;
+};
+
 void Game::loadGameState(const std::string& filename)
 {
     std::ifstream file(filename);
     if (!file) throw GameException("Failed to open save file", "Game::loadGameState");
 
-    // Clear existing objects on this screen
-    for (auto obj : gameObjects) delete obj;
-    gameObjects.clear();
     player1.forceDropItem();
     player2.forceDropItem();
 
     std::string line, cmd;
-
-    // Temp storage for held item coordinates
+    int savedScreenId = -1;
     int p1ItemX = -1, p1ItemY = -1;
     int p2ItemX = -1, p2ItemY = -1;
+
+    // רשימה לחיבור מתגים
+    std::vector<PendingSwitch> switchLinks;
 
     while (file >> cmd)
     {
         if (cmd == "SCREEN_ID") {
-            int id; file >> id;
-            currentScreen = &screens[id];
+            file >> savedScreenId;
+
+            // 1. עדכון המסך הנוכחי
+            currentScreen = &screens[savedScreenId];
+
+            // === התיקון הקריטי: שחזור ה-Legend וה-HUD ===
+            if (currentScreen->hasLegendDefined()) {
+                Point lPos = currentScreen->getLegendStart();
+                int legendBaseX = lPos.getX();
+                int legendBaseY = lPos.getY();
+                const int LEGEND_WIDTH = 75;
+
+                // א. ציור מחדש של המסגרת (ליתר ביטחון, למקרה שהקובץ לא שמר אותה)
+                for (int y = legendBaseY; y <= legendBaseY + 2; ++y) {
+                    for (int x = legendBaseX; x < legendBaseX + LEGEND_WIDTH; ++x) {
+                        if (y >= 0 && y < Screen::HEIGHT && x >= 0 && x < Screen::WIDTH) {
+                            currentScreen->setChar(x, y, '#');
+                        }
+                    }
+                }
+
+                // ב. עדכון השחקנים איפה להדפיס את הטקסט!
+                int textRowY = legendBaseY + 1;
+                player1.setHudPosition(legendBaseX + 1, textRowY);
+                player2.setHudPosition(legendBaseX + 17, textRowY);
+            }
+            // ==============================================
+
+            // ניקוי אובייקטים מהמסך שנטען
+            auto it = gameObjects.begin();
+            while (it != gameObjects.end()) {
+                if ((*it)->getScreenId() == (ScreenId)savedScreenId) {
+                    delete* it;
+                    it = gameObjects.erase(it);
+                }
+                else {
+                    ++it;
+                }
+            }
         }
-        else if (cmd == "SEED") {
-            file >> randomSeed;
-            srand(randomSeed);
-        }
-        else if (cmd == "CYCLE") {
-            file >> cycleCounter;
-        }
+        else if (cmd == "SEED") { file >> randomSeed; srand(randomSeed); }
+        else if (cmd == "CYCLE") { file >> cycleCounter; }
         else if (cmd == "MAP_LAYOUT") {
             std::vector<std::string> newLayout;
-            std::getline(file, line); // Skip newline
+            std::getline(file, line);
             while (std::getline(file, line) && line != "END_MAP") {
                 newLayout.push_back(line);
             }
             currentScreen->setLayout(newLayout);
         }
+        // ... (המשך הקוד נשאר אותו דבר: PLAYER, OBJECTS וכו') ...
         else if (cmd == "PLAYER") {
-            int id, x, y, lives, score, itemX, itemY;
-            file >> id >> x >> y >> lives >> score >> itemX >> itemY;
-
-            if (id == 1) {
-                player1.initForLevel(x, y, '$', currentScreen->getScreenId());
-                player1.setLives(lives);
-                player1.setScore(score);
-                p1ItemX = itemX; p1ItemY = itemY;
-            }
-            else {
-                player2.initForLevel(x, y, '&', currentScreen->getScreenId());
-                player2.setLives(lives);
-                player2.setScore(score);
-                p2ItemX = itemX; p2ItemY = itemY;
-            }
+            int id, x, y, lives, score, itemX, itemY, levelId;
+            file >> id >> x >> y >> lives >> score >> itemX >> itemY >> levelId;
+            Player* p = (id == 1) ? &player1 : &player2;
+            p->initForLevel(x, y, (id == 1 ? '$' : '&'), (ScreenId)levelId);
+            p->setLives(lives);
+            p->setScore(score);
+            if (id == 1) { p1ItemX = itemX; p1ItemY = itemY; }
+            else { p2ItemX = itemX; p2ItemY = itemY; }
         }
         else if (cmd == "OBJECTS_START") {
             std::string type;
@@ -1204,31 +1302,30 @@ void Game::loadGameState(const std::string& filename)
                 std::string params;
                 std::getline(file, params);
                 std::stringstream ss(params);
-
                 GameObject* newObj = createObjectFromSave(type, ss);
                 if (newObj) {
                     gameObjects.push_back(newObj);
+                    if (type == "SWITCH") {
+                        Switch* s = dynamic_cast<Switch*>(newObj);
+                        PendingSwitch ps; ps.s = s;
+                        int tx, ty;
+                        while (ss >> tx >> ty) ps.targets.push_back({ tx, ty });
+                        switchLinks.push_back(ps);
+                    }
                 }
             }
         }
     }
 
-    // 3. Reconnect Held Items (Using Coordinates)
-    if (p1ItemX != -1) {
-        GameObject* item = findObjectAt(p1ItemX, p1ItemY);
-        if (item) {
-            item->Collected();
-            player1.collectItem(item);
+    // חיבור מתגים וחפצים (כמו בקוד הקודם)
+    for (auto& link : switchLinks) {
+        for (auto& coord : link.targets) {
+            GameObject* targetObj = findObjectAt(coord.first, coord.second);
+            if (targetObj) link.s->addTarget(targetObj);
         }
     }
-
-    if (p2ItemX != -1) {
-        GameObject* item = findObjectAt(p2ItemX, p2ItemY);
-        if (item) {
-            item->Collected();
-            player2.collectItem(item);
-        }
-    }
+    if (p1ItemX != -1) { auto item = findObjectAt(p1ItemX, p1ItemY); if (item) { item->Collected(); player1.collectItem(item); } }
+    if (p2ItemX != -1) { auto item = findObjectAt(p2ItemX, p2ItemY); if (item) { item->Collected(); player2.collectItem(item); } }
 
     file.close();
 }

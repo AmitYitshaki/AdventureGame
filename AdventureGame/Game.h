@@ -139,6 +139,8 @@ private:
     // Factory: Creates an object from a text line
     GameObject* createObjectFromSave(const std::string& type, std::stringstream& ss);
 
+    const RiddleData* getRiddleDataById(int id) const;
+
 public:
     static void setStatusMessage(const std::string& msg);
 

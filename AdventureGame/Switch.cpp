@@ -29,6 +29,13 @@ void Switch::toggle()
 
 std::string Switch::getTypeName() const { return "SWITCH"; }
 std::string Switch::getSaveData() const {
-    // Format: X Y Active(1/0)
-    return GameObject::getSaveData() + " " + (active ? "1" : "0");
+    // פורמט: X Y Active(1/0) Count [Tx1 Ty1 Tx2 Ty2 ...]
+    std::string s = GameObject::getSaveData() + " " + (active ? "1" : "0");
+
+    s += " " + std::to_string(targets.size());
+    for (auto target : targets) {
+        // שומרים את המיקום של כל לייזר שהמתג מחובר אליו
+        s += " " + std::to_string(target->getX()) + " " + std::to_string(target->getY());
+    }
+    return s;
 }
