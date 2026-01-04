@@ -33,4 +33,6 @@ public:
     void setDoorProperties(int id, ScreenId targetScreen, bool isLocked);
     bool unlock(Player& player);
     bool handleCollision(Player& p, const Screen& screen) override;
+    std::string getTypeName() const override;
+    std::string getSaveData() const override;
 };

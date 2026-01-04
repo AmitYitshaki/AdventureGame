@@ -3,6 +3,7 @@
 #include "Direction.h"
 #include "ScreenID.h"
 #include <vector>
+#include <sstream>
 
 
 class Screen;
@@ -68,6 +69,8 @@ public:
     int getScore() const { return score; }
     void decreaseLife() { if (live > 0) live--; }
     void addScore(int amount) { score += amount; }
+    void setLives(int l) { live = l; }
+    void setScore(int s) { score = s; }
     void resetStats();
     void saveState() { savedLife = live; savedScore = score; }
     void restoreState();
@@ -97,6 +100,8 @@ public:
     void startSpringEffect(int power);
     void updateSpringEffect();
     void stopSpringEffect();
+
+    std::string getSaveData(int id) const;
 
 private:
     void calculateMovementDelta(int& dx, int& dy) const;

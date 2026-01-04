@@ -30,4 +30,6 @@ public:
     void receiveSignal(bool state) override;
     bool handleCollision(Player& p, const Screen& screen) override;
 	bool isActive() const { return active; }
+    std::string getTypeName() const override;
+    std::string getSaveData() const override;
 };

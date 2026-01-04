@@ -38,3 +38,9 @@ bool Bomb::tick()
     }
     return false;
 }
+std::string Bomb::getTypeName() const { return "BOMB"; }
+
+std::string Bomb::getSaveData() const {
+    // Format: X Y Active(1/0) TicksLeft
+    return GameObject::getSaveData() + " " + (active ? "1" : "0") + " " + std::to_string(ticksLeft);
+}

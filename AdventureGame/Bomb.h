@@ -34,4 +34,6 @@ public:
 	void activate();
 	static constexpr int getExplosionRadius() { return EXPLOSION_RADIUS; }
 	bool tick();
+	std::string getTypeName() const override;
+	std::string getSaveData() const override;
 };

@@ -31,4 +31,6 @@ public:
     void addTarget(GameObject* obj);
     bool handleCollision(Player& p, const Screen& screen) override;
     void toggle();
+    std::string getTypeName() const override;
+    std::string getSaveData() const override;
 };

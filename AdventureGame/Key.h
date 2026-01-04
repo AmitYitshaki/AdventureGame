@@ -25,4 +25,10 @@ public:
 
     void setKeyID(int newID) { keyID = newID; }
     int getKeyID() const { return keyID; }
+
+    std::string getTypeName() const override { return "KEY"; }
+    std::string getSaveData() const override {
+        // Format: X Y KeyID
+        return GameObject::getSaveData() + " " + std::to_string(keyID);
+    }
 };

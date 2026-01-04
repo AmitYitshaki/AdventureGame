@@ -149,3 +149,15 @@ bool Spring::handleExplosionAt(int x, int y)
     }
     return parts.empty();
 }
+
+std::string Spring::getTypeName() const { return "SPRING"; }
+std::string Spring::getSaveData() const {
+    // Format: X Y Direction(char) TargetScreen Length
+    char dirC = 'U';
+    if (direction == Direction::DOWN) dirC = 'D';
+    if (direction == Direction::LEFT) dirC = 'L';
+    if (direction == Direction::RIGHT) dirC = 'R';
+
+    return GameObject::getSaveData() + " " + dirC + " " +
+        std::to_string((int)getScreenId()) + " " + std::to_string(getLength());
+}

@@ -349,3 +349,25 @@ void Player::restoreState() {
     flying = false;
     loaded = false;
 }
+
+std::string Player::getSaveData(int id) const
+{
+    // Format: PLAYER <id> <x> <y> <lives> <score> <HeldItemX> <HeldItemY>
+    // If no item is held, HeldItemX/Y will be -1 -1
+
+    int itemX = -1;
+    int itemY = -1;
+
+    if (heldItem != nullptr) {
+        itemX = heldItem->getX();
+        itemY = heldItem->getY();
+    }
+
+    std::stringstream ss;
+    ss << "PLAYER " << id << " "
+        << getX() << " " << getY() << " "
+        << live << " " << score << " "
+        << itemX << " " << itemY;
+
+    return ss.str();
+}

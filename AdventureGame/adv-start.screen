@@ -12,8 +12,8 @@
 #               |                                                   |          #
 #               |            1 - Start New Game                     |          #
 #               |            2 - Instructions                       |          #
-#               |            3 - Quit                               |          #
-#               |                                                   |          #
+#               |            3 - continue Last Game                 |          #
+#               |            4 - Quit                               |          #
 #               |            C - Toggle Color                       |          #
 #               |            S - Toggle Sound                       |          #
 #               |                                                   |          #

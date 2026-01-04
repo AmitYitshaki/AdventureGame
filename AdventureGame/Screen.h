@@ -55,6 +55,7 @@ public:
     // --- Accessors ---
     ScreenId getScreenId() const { return screenID; }
     void setScreenId(ScreenId id) { screenID = id; }
+    const std::vector<std::string>& getLayout() const { return layout; }
 
     bool isDark() const { return dark; }
     void setDark(bool isDark) { dark = isDark; }

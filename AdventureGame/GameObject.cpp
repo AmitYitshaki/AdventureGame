@@ -41,3 +41,7 @@ bool GameObject::handleExplosionAt(int x, int y)
 {
     return isAtPosition(x, y);
 }
+
+std::string GameObject::getSaveData() const {
+    return std::to_string(getX()) + " " + std::to_string(getY());
+}

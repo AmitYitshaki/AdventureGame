@@ -43,6 +43,9 @@ public:
     int getLength() const { return (int)parts.size(); }
     void rebuild(Direction dir, int length);
 
+    std::string getTypeName() const override;
+    std::string getSaveData() const override;
+
 private:
     std::vector<Point> parts;
     Direction direction;

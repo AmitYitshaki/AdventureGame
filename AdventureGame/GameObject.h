@@ -1,6 +1,7 @@
 #pragma once
 #include "Point.h"
 #include "ScreenID.h"
+#include <sstream>
 #include <vector> 
 #include <string>
 
@@ -66,6 +67,13 @@ public:
     void setChar(char newC) { point.setChar(newC); }
 
     virtual bool isAtPosition(int x, int y) const { return (x == point.getX() && y == point.getY()); }
+
+    // Returns the type string for the Factory (e.g., "KEY", "BOMB")
+    virtual std::string getTypeName() const { return "UNKNOWN"; }
+
+    // Returns a string with the specific data needed to recreate this object
+    // Format: X Y [SpecificData]
+    virtual std::string getSaveData() const;
 
 protected:
     Point point;

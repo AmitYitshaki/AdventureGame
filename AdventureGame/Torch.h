@@ -17,4 +17,7 @@ public:
         : GameObject(x, y, c, screen, false, false)
     {
     }
+
+    std::string getTypeName() const override { return "TORCH"; }
+    // Torch has no extra data beyond X,Y, uses default getSaveData()
 };

@@ -74,3 +74,9 @@ bool Door::handleCollision(Player& p, const Screen& screen)
 
     return true; // Allow movement into the now empty space
 }
+std::string Door::getTypeName() const { return "DOOR"; }
+std::string Door::getSaveData() const {
+    // Format: X Y DoorID TargetScreen Locked(1/0)
+    return GameObject::getSaveData() + " " + std::to_string(doorID) + " " +
+        std::to_string((int)leadsTo) + " " + (locked ? "1" : "0");
+}

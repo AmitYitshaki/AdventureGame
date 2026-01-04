@@ -146,3 +146,13 @@ void Obstacle::printDebugInfo() const {
     }
     std::cout << std::endl;
 }
+
+std::string Obstacle::getTypeName() const { return "OBSTACLE"; }
+std::string Obstacle::getSaveData() const {
+    // Format: X Y Count Part1X Part1Y Part2X Part2Y ...
+    std::string s = GameObject::getSaveData() + " " + std::to_string(parts.size());
+    for (const auto& p : parts) {
+        s += " " + std::to_string(p.getX()) + " " + std::to_string(p.getY());
+    }
+    return s;
+}

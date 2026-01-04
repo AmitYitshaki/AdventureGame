@@ -26,3 +26,9 @@ void Switch::toggle()
         target->receiveSignal(active);
     }
 }
+
+std::string Switch::getTypeName() const { return "SWITCH"; }
+std::string Switch::getSaveData() const {
+    // Format: X Y Active(1/0)
+    return GameObject::getSaveData() + " " + (active ? "1" : "0");
+}

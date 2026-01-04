@@ -12,6 +12,7 @@
 #include <sstream>
 #include <windows.h>
 #include <memory> 
+#include <cctype>
 #include <thread> // <--- ADDED for non-blocking sound
 
 // =============================================================
@@ -38,10 +39,18 @@
 #include "Switch.h"
 #include "Laser.h"
 
+enum class RunMode {
+    Normal,
+    Save,   // Recording input
+    Load,   // Replaying input visually
+    Silent  // Replaying input without visuals (Testing)
+};
+
 class Game
 {
 public:
     Game();
+    Game(RunMode mode = RunMode::Normal);
     ~Game();
 
     Game(const Game&) = delete;
@@ -92,7 +101,6 @@ private:
     void ChangeDirection(char c);
     void handleRiddleInput(char key);
     void stopMovement();
-    void checkIsPlayerLoaded();
     bool checkPlayerHasRiddle();
     void checkLevelTransition();
     void gameOverScreen(const std::string& message);
@@ -108,11 +116,35 @@ private:
     void applyBombEffects(int cx, int cy, Screen& curr_screen, int R);
     void safeDeleteObject(GameObject* objToRemove);
 
+    //--- Recording & Playback Implementation---
+    void initStepsFile();
+    void recordInput(char key);
+    char getRecordedInput(); // Replaces _kbhit in Load mode
+    void reportEvent(const std::string& eventType, const std::string& details);
+    void checkExpectedResult(const std::string& eventType, const std::string& details);
+    void showLoadGameMenu(); // Helper to display available saves (optional)
+
+    // --- Update Helpers (Refactoring) ---
+    void processPlayerMovement(Player& p, Player* other); // מטפל בלולאת המהירות
+    void handleInteractions();                            // מטפל בחידות ואינטראקציות
+    void checkGameStatus();                               // בודק חיים ו-Game Over
+    void handleFlowControl();                             // מטפל ב-Restart/Exit
+    void checkPlaybackStatus();                           // מטפל בסיום הקלטה
+
+    // --- Save/Load System ---
+    void saveGameState(const std::string& filename);
+    void loadGameState(const std::string& filename);
+    // Helper to find an object at specific coords (for re-linking items)
+    GameObject* findObjectAt(int x, int y);
+    // Factory: Creates an object from a text line
+    GameObject* createObjectFromSave(const std::string& type, std::stringstream& ss);
+
 public:
     static void setStatusMessage(const std::string& msg);
 
 private:
     static constexpr int TICK_MS = 64;
+    const std::string SAVE_FILENAME = "savegame.sav";
 
     Player player1;
     Player player2;
@@ -133,4 +165,15 @@ private:
     static bool soundEnabled; // Changed to static
 
     static std::string statusMessage;
+
+	// Recording & Playback
+    RunMode currentMode;
+    unsigned long cycleCounter = 0; // The game "Time"
+    unsigned int randomSeed = 0;
+
+    // File handling for recording
+    std::ofstream stepsFileOut;       // For saving steps
+    std::ifstream stepsFileIn;        // For loading steps
+    std::vector<std::pair<long, char>> stepsBuffer; // Stores loaded steps for fast access: <Cycle, Key>
+    size_t playbackIndex = 0;         // Current position in stepsBuffer
 };

@@ -28,6 +28,9 @@ public:
 
     void printDebugInfo() const;
 
+    std::string getTypeName() const override;
+    std::string getSaveData() const override;
+
 private:
     std::vector<Point> parts;
 
