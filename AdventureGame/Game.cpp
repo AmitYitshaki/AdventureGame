@@ -438,6 +438,8 @@ void Game::handleInput()
         if (!_kbhit()) return;
         key = _getch();
         if (currentMode == RunMode::Save) {
+			if (RiddleMode && key == 27)  //to prevent recording ESC key during riddle mode
+                return;
             recordInput(key);
         }
     }
@@ -745,12 +747,12 @@ void Game::checkLevelTransition()
     ScreenId t2 = player2.getCurrentLevel();
     ScreenId real = currentScreen->getScreenId();
 
-    if (t1 != real && t2 == real) {
+    if (t1 != real && t2 == real && player1.getX() != -1) {
         setStatusMessage("p1 change Room!");
         reportEvent("SCREEN_CHANGE", "P1 to " + std::to_string((int)t1));
         player1.updatepoint(-1, -1);
     }
-    else if (t2 != real && t1 == real) {
+    else if (t2 != real && t1 == real && player2.getX() != -1) {
         setStatusMessage("p2 change Room!");
         reportEvent("SCREEN_CHANGE", "P2 to " + std::to_string((int)t2));
         player2.updatepoint(-1, -1);
@@ -760,12 +762,6 @@ void Game::checkLevelTransition()
 
         if (t1 == FINAL_LEVEL) {
             reportEvent("GAME_WON", "Finished Last Level");
-
-            // בטסטים אוטומטיים - סיום מיידי
-            if (currentMode == RunMode::Silent) {
-                isRunning = false;
-                return;
-            }
         }
         playSound(523, 100); // Level Complete Chime (C)
         playSound(659, 100); // (E)
@@ -899,13 +895,13 @@ void Game::startRiddle(Riddle* riddle, Player& p)
     currentRiddlePlayer = &p;
     RiddleMode = true;
     stopMovement();
-    setStatusMessage("Riddle time! Press 1-4 to answer.");
+    setStatusMessage("Riddle time! Press 1-4 ");
 }
 
 void Game::loadRiddlesFromFile(const std::string& filename)
 {
     std::ifstream file(filename);
-    if (!file) return;
+    if (!file){ throw GameException("Missing Riddles File: " + filename, "Game::loadRiddlesFromFile"); return;}
     riddlesPool.clear();
     std::string line;
     RiddleData current;
@@ -1041,13 +1037,6 @@ void Game::pauseScreen()
         if (key == 'h' || key == 'H') {
 
             reportEvent("GAME_ENDED", "User Quit to Menu");
-
-            // אם אנחנו באמצע ניגון הקלטה, יציאה לתפריט מסיימת את הריצה
-            if (currentMode == RunMode::Load || currentMode == RunMode::Silent) {
-                isRunning = false;
-                return;
-            }
-
             // יציאה רגילה לתפריט
             goToScreen(ScreenId::HOME);
             setStatusMessage("");
@@ -1147,6 +1136,10 @@ void Game::safeDeleteObject(GameObject* objToRemove)
 
 void Game::visualizeExplosion(int cx, int cy, int radius)
 {
+    // === תיקון: במצב שקט אסור לצייר ואסור לישון ===
+    if (currentMode == RunMode::Silent) return;
+    // ==============================================
+
     for (int y = cy - radius; y <= cy + radius; ++y) {
         for (int x = cx - radius; x <= cx + radius; ++x) {
             if (x >= 0 && x < Screen::WIDTH && y >= 0 && y < Screen::HEIGHT) {
@@ -1160,6 +1153,7 @@ void Game::visualizeExplosion(int cx, int cy, int radius)
     gotoxy(0, 0);
     Sleep(2 * TICK_MS);
 }
+
 void Game::processPlayerMovement(Player& p, Player* other)
 {
     // חישוב מספר הצעדים בטיק אחד (תלוי במהירות/תעופה)
