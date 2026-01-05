@@ -20,7 +20,7 @@ Game::Game(RunMode mode)
 {
     system("mode con: cols=80 lines=50");
     if (currentMode == RunMode::Load || currentMode == RunMode::Silent) {
-        initStepsFile();
+        initFiles();
 		srand(randomSeed); // Ensure consistent randomness for replay
 	}
     else
@@ -29,7 +29,7 @@ Game::Game(RunMode mode)
         srand(randomSeed);
 
         if (currentMode == RunMode::Save) {
-            initStepsFile();
+            initFiles();
 		}
     }
 
@@ -38,8 +38,7 @@ Game::Game(RunMode mode)
 
 Game::~Game()
 {
-	if (stepsFileOut.is_open()) stepsFileOut.close();
-	if (stepsFileIn.is_open()) stepsFileIn.close();
+    closeFiles();
 
     for (auto obj : gameObjects) delete obj;
     gameObjects.clear();
@@ -168,8 +167,13 @@ void Game::restartCurrentLevel()
 
 void Game::gameOverScreen(const std::string& message)
 {
+    // דיווח לקובץ התוצאות שהמשחק נגמר (כדי שנוכל לוודא את זה בטסט)
+    reportEvent("GAME_OVER", message);
+
     playSound(100, 600); // Long low beep
     system("cls");
+
+    // --- קוד הציור (נשאר זהה) ---
     const int BOX_WIDTH = 50;
     const int BOX_HEIGHT = 9;
     int x = (Screen::WIDTH - BOX_WIDTH) / 2;
@@ -191,12 +195,33 @@ void Game::gameOverScreen(const std::string& message)
     printCentered(4, message);
     printCentered(6, "[R] Restart Level    [H] Main Menu");
 
+    // --- הלולאה המתוקנת ---
     while (true) {
-        if (_kbhit()) {
-            char key = _getch();
-            if (key == 'R' || key == 'r') { pendingRestart = true; return; }
-            else if (key == 'H' || key == 'h') { exitToMainMenu = true; return; }
+        char key = 0;
+
+        // 1. טיפול במצב LOAD / SILENT (קריאה מהקובץ)
+        if (currentMode == RunMode::Load || currentMode == RunMode::Silent) {
+            key = getRecordedInput();
+
+            // הגנה: אם נגמרו הצעדים בקובץ ואין קלט, חייבים לצאת כדי לא להיתקע בלולאה אינסופית
+            if (key == 0) {
+                isRunning = false;
+                return;
+            }
         }
+        // 2. טיפול במצב רגיל / SAVE (קריאה מהמקלדת)
+        else {
+            if (_kbhit()) {
+                key = _getch();
+                if (currentMode == RunMode::Save) {
+                    recordInput(key); // שמירה לקובץ
+                }
+            }
+        }
+
+        // לוגיקה רגילה
+        if (key == 'R' || key == 'r') { pendingRestart = true; return; }
+        else if (key == 'H' || key == 'h') { exitToMainMenu = true; return; }
     }
 }
 
@@ -224,42 +249,77 @@ void Game::cleanupDeadObjects()
 //               FILE HANDLING (RECORDING SYSTEM)
 // =============================================================
 
-void Game::initStepsFile()
+void Game::initFiles() // החלף את initStepsFile בזה
 {
-    const std::string filename = "adv-world.steps";
-
+    // === מצב SAVE: פתיחת שני הקבצים לכתיבה ===
     if (currentMode == RunMode::Save)
     {
-        stepsFileOut.open(filename);
-        if (!stepsFileOut) {
-            throw GameException("Could not create steps file!", "Game::initStepsFile");
+        stepsFileOut.open("adv-world.steps");
+        resultFileOut.open("adv-world.result"); // פתיחת קובץ התוצאות
+
+        if (!stepsFileOut || !resultFileOut) {
+            throw GameException("Could not create record files!", "Game::initFiles");
         }
-        // כתיבת ה-Seed בשורה הראשונה
         stepsFileOut << "SEED: " << randomSeed << std::endl;
     }
+    // === מצב LOAD/SILENT: קריאת צעדים + תוצאות ===
     else if (currentMode == RunMode::Load || currentMode == RunMode::Silent)
     {
-        stepsFileIn.open(filename);
-        if (!stepsFileIn) {
-            throw GameException("Could not open steps file for reading!", "Game::initStepsFile");
-        }
+        stepsFileIn.open("adv-world.steps");
+        if (!stepsFileIn) return; // אולי אין קובץ, לא נכשלים על זה
 
         std::string header;
-        // קריאת ה-Seed: מצפים לפורמט "SEED: 12345"
         stepsFileIn >> header >> randomSeed;
+        if (header != "SEED:") throw GameException("Invalid steps format", "Game::initFiles");
 
-        if (header != "SEED:") {
-            throw GameException("Invalid steps file format (Missing SEED)", "Game::initStepsFile");
-        }
+        srand(randomSeed); // שחזור הרנדומליות
 
-        // טעינת כל הצעדים לזיכרון (Buffer) לביצועים מקסימליים
-        // פורמט בכל שורה: <cycle> <key>
-        long stepCycle;
-        char stepKey;
-        while (stepsFileIn >> stepCycle >> stepKey) {
-            stepsBuffer.push_back({ stepCycle, stepKey });
+        long t; char k;
+        while (stepsFileIn >> t >> k) {
+            stepsBuffer.push_back({ t, k });
         }
         stepsFileIn.close();
+
+        loadExpectedResults(); // טעינת הצפי לקובץ התוצאות
+    }
+}
+
+void Game::loadExpectedResults()
+{
+    std::ifstream resIn("adv-world.result");
+    if (!resIn) return;
+
+    long t;
+    std::string type;
+    while (resIn >> t >> type) {
+        std::string details;
+        std::getline(resIn, details);
+        // ניקוי רווח בהתחלה שנוצר מ-getline
+        if (!details.empty() && details[0] == ' ') details.erase(0, 1);
+        expectedResults.push_back({ t, type, details });
+    }
+    resIn.close();
+}
+
+void Game::closeFiles()
+{
+    if (stepsFileOut.is_open()) stepsFileOut.close();
+    if (resultFileOut.is_open()) resultFileOut.close();
+
+    // במצב שקט, מדפיסים בסוף אם הטסט עבר
+    if (currentMode == RunMode::Silent) {
+        if (testFailed) {
+            std::cout << "Test Failed: " << failureReason << std::endl;
+        }
+        else if (!expectedResults.empty()) {
+            std::cout << "Test Failed: Game ended but missed expected events." << std::endl;
+        }
+        else {
+            std::cout << "Test Passed" << std::endl;
+        }
+        // כדי שיראו את התוצאה לפני שהחלון נסגר
+        std::cout << "Press any key to exit...";
+        _getch();
     }
 }
 
@@ -286,6 +346,44 @@ char Game::getRecordedInput()
         return key;
     }
     return 0;
+}
+
+void Game::reportEvent(const std::string& type, const std::string& details)
+{
+    // 1. שמירה לקובץ (בזמן הקלטה)
+    if (currentMode == RunMode::Save && resultFileOut.is_open()) {
+        resultFileOut << cycleCounter << " " << type << " " << details << std::endl;
+    }
+
+    // 2. בדיקה מול הצפי (בזמן הרצה אוטומטית)
+    if (currentMode == RunMode::Load || currentMode == RunMode::Silent) {
+        verifyEvent(type, details);
+    }
+}
+
+void Game::verifyEvent(const std::string& type, const std::string& details)
+{
+    if (testFailed) return;
+
+    if (expectedResults.empty()) {
+        testFailed = true;
+        failureReason = "Unexpected event: " + type + " (Expected nothing)";
+        isRunning = false; // עצירת הריצה כי נכשלנו
+        return;
+    }
+
+    GameEvent expected = expectedResults.front();
+    expectedResults.pop_front();
+
+    // השוואה: מאפשרים סטייה קלה של 1-2 טיקים בזמן (לפעמים קורה בגלל סדר פעולות)
+    long timeDiff = std::abs(expected.cycle - (long)cycleCounter);
+
+    if (timeDiff > 2 || expected.type != type || expected.details != details) {
+        testFailed = true;
+        failureReason = "Mismatch! Exp: [" + std::to_string(expected.cycle) + " " + expected.type + " " + expected.details + "] " +
+            "Got: [" + std::to_string(cycleCounter) + " " + type + " " + details + "]";
+        isRunning = false;
+    }
 }
 
 // =============================================================
@@ -372,7 +470,7 @@ void Game::handleInput()
             }
             return;
 		}
-        if (key == '4') { end(); return; }
+        if (key == '4') { end(); reportEvent("GAME_ENDED", "Score: " + std::to_string(player1.getScore() + player2.getScore()));  return; }
         if (key == 'c' || key == 'C') {
             toggleColor();
             setStatusMessage(isColorEnabled() ? "Color: ON" : "Color: OFF");
@@ -649,14 +747,26 @@ void Game::checkLevelTransition()
 
     if (t1 != real && t2 == real) {
         setStatusMessage("p1 change Room!");
+        reportEvent("SCREEN_CHANGE", "P1 to " + std::to_string((int)t1));
         player1.updatepoint(-1, -1);
     }
     else if (t2 != real && t1 == real) {
         setStatusMessage("p2 change Room!");
+        reportEvent("SCREEN_CHANGE", "P2 to " + std::to_string((int)t2));
         player2.updatepoint(-1, -1);
     }
 
     if (t1 != real && t2 != real && t1 == t2) {
+
+        if (t1 == FINAL_LEVEL) {
+            reportEvent("GAME_WON", "Finished Last Level");
+
+            // בטסטים אוטומטיים - סיום מיידי
+            if (currentMode == RunMode::Silent) {
+                isRunning = false;
+                return;
+            }
+        }
         playSound(523, 100); // Level Complete Chime (C)
         playSound(659, 100); // (E)
         playSound(784, 200); // (G)
@@ -731,10 +841,11 @@ void Game::handleRiddleInput(char key)
 
     int selected = key - '0';
     Player& p = *currentRiddlePlayer;
+    std::string pName = (&p == &player1) ? "P1" : "P2";
 
     if (selected == currentRiddle->getCorrectAnswer()) {
+        reportEvent("RIDDLE", pName + " Correct");
         playSound(1000, 100); // Correct Sound
-        playSound(1200, 100);
         setStatusMessage("Correct! +100 Points");
 
         currentRiddlePlayer->addScore(100);
@@ -745,6 +856,7 @@ void Game::handleRiddleInput(char key)
         currentRiddlePlayer = nullptr;
     }
     else {
+        reportEvent("RIDDLE", pName + " Wrong");
         playSound(200, 300); // Error Sound
         p.decreaseLife();
         setStatusMessage("Wrong! You lost a life.");
@@ -780,6 +892,9 @@ const RiddleData* Game::getRiddleDataById(int id) const {
 void Game::startRiddle(Riddle* riddle, Player& p)
 {
     if (!riddle) return;
+    std::string pName = (&p == &player1) ? "P1" : "P2";
+    int riddleId = riddle->getData().id;
+    reportEvent("RIDDLE_START", pName + " ID:" + std::to_string(riddleId));
     currentRiddle = riddle;
     currentRiddlePlayer = &p;
     RiddleMode = true;
@@ -848,7 +963,7 @@ void Game::pauseScreen()
 {
     // חישוב המיקום למרכז המסך
     int x = (Screen::WIDTH - 37) / 2;
-    int y = (Screen::HEIGHT - 6) / 2; // הרחבנו מעט את הגובה
+    int y = (Screen::HEIGHT - 6) / 2;
 
     // ציור המסגרת והתפריט
     gotoxy(x, y);     std::cout << "*************************************";
@@ -861,37 +976,82 @@ void Game::pauseScreen()
 
     // לולאת הקלט של התפריט
     while (true) {
-        if (_kbhit()) {
-            char key = _getch();
-            
-            // 1. חזרה למשחק
-            if (key == 27) { // ESC
-                // מחיקת התפריט מהמסך (אופציונלי, ה-Draw הבא ינקה בכל מקרה)
+        char key = 0;
+
+        // === 1. קריאת קלט (אוטומטי או ידני) ===
+        if (currentMode == RunMode::Load || currentMode == RunMode::Silent) {
+            key = getRecordedInput(); // שואב את המקש מההקלטה
+
+            // הגנה: אם נגמרו הצעדים בקובץ ואין קלט, חייבים לצאת
+            if (key == 0) {
+                isRunning = false;
                 return;
             }
-            
-            // 2. שמירת מצב (הבונוס)
-            if (key == 's' || key == 'S') {
-                try {
-                    saveGameState("savegame.sav"); // הקריאה לפונקציה שעוד מעט נממש
-                    
-                    // משוב למשתמש שהשמירה הצליחה
-                    gotoxy(x + 2, y + 2); 
-                    std::cout << "      Game Saved Successfully!     ";
-                    Sleep(1000); // השהיה קצרה כדי שיראו את ההודעה
-                    return; // חוזרים למשחק
+        }
+        else {
+            if (_kbhit()) {
+                key = _getch();
+                // אם אנחנו במצב הקלטה, שומרים גם את הפעולות בתוך ה-Pause
+                if (currentMode == RunMode::Save) {
+                    recordInput(key);
                 }
-                catch (const std::exception& e) {
-                    setStatusMessage("Save Failed!");
-                }
+            }
+        }
+
+        if (key == 0) continue; // לא נלחץ כלום
+
+        // === 2. לוגיקת מקשים ===
+
+        // [ESC] חזרה למשחק
+        if (key == 27) {
+            return;
+        }
+
+        // [S] שמירת מצב
+        if (key == 's' || key == 'S') {
+
+            // הגנה: חסימת שמירה בזמן הקלטה כדי לא לשבור את רצף הצעדים
+            if (currentMode == RunMode::Save) {
+                gotoxy(x + 2, y + 2);
+                std::cout << " Recording Mode: Save Disabled ";
+                Sleep(1000);
+                gotoxy(x + 2, y + 2);
+                std::cout << "                               "; // מחיקת ההודעה
+                continue;
             }
 
-            // 3. יציאה לתפריט ראשי
-            if (key == 'h' || key == 'H') {
-                goToScreen(ScreenId::HOME);
-                setStatusMessage("");
+            try {
+                saveGameState("savegame.sav");
+
+                gotoxy(x + 2, y + 2);
+                std::cout << "      Game Saved Successfully!     ";
+
+                // בטעינה אוטומטית אין צורך להמתין
+                if (currentMode != RunMode::Silent) {
+                    Sleep(1000);
+                }
+                return; // חוזרים למשחק אחרי השמירה
+            }
+            catch (const std::exception& e) {
+                setStatusMessage("Save Failed!");
+            }
+        }
+
+        // [H] יציאה לתפריט ראשי
+        if (key == 'h' || key == 'H') {
+
+            reportEvent("GAME_ENDED", "User Quit to Menu");
+
+            // אם אנחנו באמצע ניגון הקלטה, יציאה לתפריט מסיימת את הריצה
+            if (currentMode == RunMode::Load || currentMode == RunMode::Silent) {
+                isRunning = false;
                 return;
             }
+
+            // יציאה רגילה לתפריט
+            goToScreen(ScreenId::HOME);
+            setStatusMessage("");
+            return;
         }
     }
 }
@@ -905,6 +1065,8 @@ void Game::updateBombs()
         if (!bomb || bomb->getScreenId() != curr_screen) continue;
 
         if (bomb->tick()) {
+            std::string location = std::to_string(bomb->getX()) + "," + std::to_string(bomb->getY());
+            reportEvent("BOMB_EXPLODE", location);
             playSound(150, 150); // Now async!
             Point c = bomb->getPoint();
             int radius = Bomb::getExplosionRadius();
@@ -1033,11 +1195,9 @@ void Game::checkGameStatus()
     if (pendingRestart || exitToMainMenu) return;
 
     if (player1.getLive() <= 0) {
-        // reportEvent("LIFE_LOST", "Player 1 died"); // נוסיף בהמשך לקובץ Result
         gameOverScreen("Player 1 ran out of lives!");
     }
     else if (player2.getLive() <= 0) {
-        // reportEvent("LIFE_LOST", "Player 2 died"); // נוסיף בהמשך לקובץ Result
         gameOverScreen("Player 2 ran out of lives!");
     }
 }

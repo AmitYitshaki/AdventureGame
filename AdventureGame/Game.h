@@ -14,6 +14,7 @@
 #include <memory> 
 #include <cctype>
 #include <thread> // <--- ADDED for non-blocking sound
+#include <deque>
 
 // =============================================================
 //                     PROJECT INCLUDES
@@ -44,6 +45,12 @@ enum class RunMode {
     Save,   // Recording input
     Load,   // Replaying input visually
     Silent  // Replaying input without visuals (Testing)
+};
+
+struct GameEvent {
+    long cycle;
+    std::string type;    // e.g., "SCREEN_CHANGE", "LIFE_LOST"
+    std::string details; // e.g., "P1 ROOM2", "CORRECT"
 };
 
 class Game
@@ -116,13 +123,17 @@ private:
     void applyBombEffects(int cx, int cy, Screen& curr_screen, int R);
     void safeDeleteObject(GameObject* objToRemove);
 
-    //--- Recording & Playback Implementation---
-    void initStepsFile();
+    // --- Recording & Playback Implementation ---
+    void initFiles();              // שיניתי את השם מ-initStepsFile כי זה מטפל גם ב-results
+    void closeFiles();             // פונקציה חדשה לסגירה ודיווח
+
     void recordInput(char key);
-    char getRecordedInput(); // Replaces _kbhit in Load mode
-    void reportEvent(const std::string& eventType, const std::string& details);
-    void checkExpectedResult(const std::string& eventType, const std::string& details);
-    void showLoadGameMenu(); // Helper to display available saves (optional)
+    char getRecordedInput();
+
+    // ניהול תוצאות
+    void loadExpectedResults();    // טעינת קובץ התוצאות לזיכרון
+    void reportEvent(const std::string& type, const std::string& details); // דיווח מרכזי
+    void verifyEvent(const std::string& type, const std::string& details); // אימות מול הצפי
 
     // --- Update Helpers (Refactoring) ---
     void processPlayerMovement(Player& p, Player* other); // מטפל בלולאת המהירות
@@ -147,6 +158,7 @@ public:
 private:
     static constexpr int TICK_MS = 64;
     const std::string SAVE_FILENAME = "savegame.sav";
+	static constexpr ScreenId FINAL_LEVEL = ScreenId::ROOM4; // <---------------- if adding more levels, change this
 
     Player player1;
     Player player2;
@@ -173,9 +185,15 @@ private:
     unsigned long cycleCounter = 0; // The game "Time"
     unsigned int randomSeed = 0;
 
-    // File handling for recording
-    std::ofstream stepsFileOut;       // For saving steps
-    std::ifstream stepsFileIn;        // For loading steps
-    std::vector<std::pair<long, char>> stepsBuffer; // Stores loaded steps for fast access: <Cycle, Key>
-    size_t playbackIndex = 0;         // Current position in stepsBuffer
+    std::ofstream stepsFileOut;
+    std::ifstream stepsFileIn;
+    std::vector<std::pair<long, char>> stepsBuffer;
+    size_t playbackIndex = 0;
+
+    // === NEW: Result File Handling ===
+    std::ofstream resultFileOut;           // לכתיבת תוצאות (Save Mode)
+    std::deque<GameEvent> expectedResults; // לאימות תוצאות (Load/Silent Mode)
+
+    bool testFailed = false;
+    std::string failureReason;
 };

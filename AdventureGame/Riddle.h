@@ -41,6 +41,7 @@ public:
     Riddle(int x, int y, ScreenId screen) : GameObject(x, y, '?', screen) {}
 
     void setData(const RiddleData& newData) { data = newData; }
+	const RiddleData& getData() const { return data; }
     int getCorrectAnswer() const { return data.correctAnswer; }
 
     const char* getLine(int row) const {
