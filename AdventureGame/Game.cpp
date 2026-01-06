@@ -244,6 +244,10 @@ void Game::gameOverScreen(const std::string& message)
             // === התיקון: סגירת ההקלטה בחזרה לתפריט ===
             stopRecordingSession();
             // =========================================
+            if (currentMode == RunMode::Load || currentMode == RunMode::Silent) {
+                isRunning = false; // הורג את הלולאה הראשית
+                return;            // יוצא מהפונקציה
+            }
 
             // בטסטים - יציאה לתפריט מסיימת את התוכנית
             if (currentMode == RunMode::Load || currentMode == RunMode::Silent) {
@@ -506,7 +510,7 @@ void Game::handleInput()
             }
             return;
 		}
-        if (key == '4') { end(); reportEvent("GAME_ENDED", "Score: " + std::to_string(player1.getScore() + player2.getScore()));  return; }
+        if (key == 'q' || key == 'Q') { end(); reportEvent("GAME_ENDED", "Score: " + std::to_string(player1.getScore() + player2.getScore()));  return; }
         if (key == 'c' || key == 'C') {
             toggleColor();
             setStatusMessage(isColorEnabled() ? "Color: ON" : "Color: OFF");
@@ -522,13 +526,25 @@ void Game::handleInput()
 
     if (currentScreen == &screens[(int)ScreenId::ROOM4]) {
         if (key == '1') { resetGame(); }
-        else if (key == 'h' || key == 'H') { stopRecordingSession(); goToScreen(ScreenId::HOME); setStatusMessage(""); }
-        else if (key == 'q' || key == 'q') { end(); }
+        else if (key == 'h' || key == 'H') { 
+            reportEvent("GAME_ENDED", "User Quit to Menu");
+            stopRecordingSession();
+            if (currentMode == RunMode::Load || currentMode == RunMode::Silent) {
+                isRunning = false; // הורג את הלולאה הראשית
+                return;            // יוצא מהפונקציה
+            }
+            goToScreen(ScreenId::HOME); setStatusMessage(""); }
+        else if (key == 'q' || key == 'Q') { end(); }
         return;
     }
 
     if (currentScreen == &screens[(int)ScreenId::INSTRUCTIONS] && (key == 'h' || key == 'H')) {
+        reportEvent("GAME_ENDED", "User Quit to Menu");
         stopRecordingSession();
+        if (currentMode == RunMode::Load || currentMode == RunMode::Silent) {
+            isRunning = false; // הורג את הלולאה הראשית
+            return;            // יוצא מהפונקציה
+		}
         goToScreen(ScreenId::HOME); return;
     }
 
@@ -966,8 +982,7 @@ void Game::loadRiddlesFromFile(const std::string& filename)
     file.close();
 
     if (shouldShuffle) {
-        unsigned int seed = (unsigned int)std::chrono::system_clock::now().time_since_epoch().count();
-        std::shuffle(riddlesPool.begin(), riddlesPool.end(), std::default_random_engine(seed));
+        std::shuffle(riddlesPool.begin(), riddlesPool.end(), std::default_random_engine(randomSeed));
     }
     else {
         std::sort(riddlesPool.begin(), riddlesPool.end(),
@@ -1073,6 +1088,11 @@ void Game::pauseScreen()
         if (key == 'h' || key == 'H') {
 
             reportEvent("GAME_ENDED", "User Quit to Menu");
+			stopRecordingSession();
+            if (currentMode == RunMode::Load || currentMode == RunMode::Silent) {
+                isRunning = false; // הורג את הלולאה הראשית
+                return;            // יוצא מהפונקציה
+			}
             // יציאה רגילה לתפריט
             goToScreen(ScreenId::HOME);
             setStatusMessage("");
