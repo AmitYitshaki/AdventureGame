@@ -185,6 +185,10 @@ private:
     unsigned long cycleCounter = 0; // The game "Time"
     unsigned int randomSeed = 0;
 
+    bool isGameSessionActive = false; // האם אנחנו בתוך משחק פעיל (לא תפריט)
+    void startRecordingSession();     // התחלת הקלטה/ניגון (איפוס שעון ופתיחת קבצים)
+    void stopRecordingSession();      // סיום הקלטה (סגירת קבצים)
+
     std::ofstream stepsFileOut;
     std::ifstream stepsFileIn;
     std::vector<std::pair<long, char>> stepsBuffer;
