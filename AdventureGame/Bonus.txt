@@ -2,40 +2,16 @@
             ADVENTURE GAME - BONUS FEATURES REQUEST
 =====================================================================
 
-We have implemented several features that go beyond the mandatory requirements
-of Exercise 2. We request bonus points for the following:
+We request bonus points for the following:
 
-1. VISUALS & AUDIO (POLISH)
-   ------------------------
-   * Color System (Configurable):
-     Implemented a full color system for better UX (Green springs, Red bombs, etc.).
-     Includes a menu option to toggle colors ON/OFF as required for the bonus.
-   * Sound Effects:
-     Added audio cues (using Windows Beep) for Spring launch, and bomb explosions, collecting items, changing room's loosing a life,riddle and so on.
-     Includes a menu option to toggle sound ON/OFF.
-   * Visual Bomb Countdown:
-     Bombs display a visual countdown timer ('3' -> '2' -> '1') on the board 
-     before exploding, giving players clear feedback.
-
-2. NEW GAME MECHANICS
-   ------------------
-   * Laser Gates:
-     Added a custom "Laser" object type not listed in the standard requirements.
-     Lasers act as togglable barriers controlled by Switches (Logic Gates).
-   * Restart Level:
-     Added a "Quality of Life" feature allowing players to restart ONLY the
-     current level upon death, instead of forcing a full game restart.
-
-3. RIDDLE SYSTEM ENHANCEMENTS
-   --------------------------
-   * Random Shuffling:
-     if decided by Game Level designer Riddles are not presented in a fixed order. The game loads them from
-     `Riddles.txt` and randomly shuffles them using a time-based seed,
-     ensuring a unique experience every run.
-
-4. SYSTEM STABILITY
-   ----------------
-   * Robust Error Handling (GameException):
-     Went beyond basic requirements by implementing a custom Exception class
-     that catches file errors or logic faults and allows the game to return
-     safely to the Main Menu instead of crashing to the desktop.
+1. EXERCISE 3 BONUS: SAVE/LOAD GAME STATE
+   --------------------------------------
+   * Full State Serialization:
+     We implemented a complete Save/Load system (triggered by 'S' in the Pause menu
+     or '3' in the Main Menu).
+   * What it saves:
+     - Exact positions of both players.
+     - Inventory status (Lives, Scores, Items held).
+     - State of all objects (Doors open/closed, Keys taken, Switches toggled).
+     - The current map layout (including destroyed walls).
+     - The Random Seed (to ensure consistency).

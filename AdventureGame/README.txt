@@ -37,6 +37,57 @@ The project implements ALL required game elements as defined in Exercise 2:
 * Launching: A loaded player CANNOT move. They must press 'STAY' to release the spring.
 * Flight: Launch power depends on spring length.
 
+--- Architecture UPDATED FOR EX3 ---
+* Game (Abstract Base Class):
+  The central engine. Manages the core game loop, physics, rendering,
+  screen transitions, and shared logic. It defines the virtual interface
+  for input handling and event reporting.
+
+* KeyBoardGame (Inherits from Game):
+  Handles interactive gameplay.
+  - inputs: From keyboard (_kbhit/_getch).
+  - outputs: Visual rendering to screen.
+  - recording: Writes inputs to `.steps` file and events to `.result` file (in -save mode).
+
+* FileGame (Inherits from Game):
+  Handles automated playback and testing.
+  - inputs: Reads steps from `.steps` file.
+  - outputs: Visual rendering (unless in -silent mode).
+  - verification: Compares actual game events against expected `.result` file.
+
+* LevelLoader (Static):
+  Utility class for parsing `.screen` files and metadata.
+
+* Main (Factory Pattern):
+  Parses command line arguments and instantiates the correct Game derived class.
+
+--- Game Modes & Usage ---
+1. Regular Game:
+   > adv-world.exe
+   Plays normally with keyboard input.
+
+2. Save Mode (Recording):
+   > adv-world.exe -save
+   Plays normally, but records every keystroke to `adv-world.steps`
+   and every major event to `adv-world.result`.
+
+3. Load Mode (Playback):
+   > adv-world.exe -load
+   Replays the game from the `adv-world.steps` file visually. Ignores keyboard input.
+
+4. Silent Mode (Testing):
+   > adv-world.exe -load -silent
+   Runs the playback as fast as possible without rendering graphics.
+   Reports "Test Passed" or "Test Failed" based on result verification.
+
+--- Level Design ---
+The game includes 3 distinct screens + 1 Victory screen:
+1. Room 1: Intro to keys, doors, and springs.
+2. Room 2: Dark Maze (requires Torch).
+3. Room 3: Puzzle level (Switches, Obstacles, Teamwork).
+4. Room 4: Victory.
+
+
 --- Room Descriptions (Level Design) ---
 The game includes 4 distinct screens demonstrating different mechanics:
 
@@ -55,38 +106,7 @@ The game includes 4 distinct screens demonstrating different mechanics:
 4. Room 4 - "Victory Screen":
    A celebration screen displaying the final status and offering a restart.
 
-* Dynamic Legend: The HUD (Legend) position changes between levels to demonstrate
-  flexibility. It is intentionally compact to maximize playable area.
 
---- LEVEL DESIGN GUIDE: How to Add New Screens ---
-To extend the game with new levels, follow these 4 steps:
-
-STEP 1: Create the File
-   - Create a new text file named `adv-world_XX.screen` (e.g., `adv-world_05.screen`).
-   - Ensure the file is 25 lines high and 80 characters wide.
-
-STEP 2: Draw the Map (ASCII Art)
-   - Use '#' for Walls.
-   - Use '$' for Player 1 start pos, '&' for Player 2.
-   - Use ' ' (Space) for empty floor.
-   - Objects: 'K'=Key, '@'=Bomb, 'W'=Spring, '?'=Riddle, '/'=Switch.
-   - Doors: Use digits '1'-'9' (The char 'D' is NOT used for doors).
-   - Legend Area: Place 'L' at the top-left of the status bar area.
-
-STEP 3: Add Metadata (Below the map)
-   Only complex objects need metadata. Bombs, Obstacles, and Riddles DO NOT need metadata.
-   Add commands at the bottom of the file:
-   - Door:    DOOR_DATA <x> <y> <id> <target_screen_id> <is_locked(0/1)>
-   - Key:     KEY_DATA <x> <y> <id>
-   - Spring:  SPRING_DATA <x> <y> <direction(U/D/L/R)> <screen_id> <length>
-   - Connect: CONNECT <switch_x> <switch_y> <target_x> <target_y>
-   - Dark:    Add the word "DARK" to make the room require a torch.
-
-STEP 4: Update the Code (Game.cpp)
-   - Add a `LevelLoader::loadLevelFromFile(...)` call in `resetGame`.
-   - Update the switch-case in `restartCurrentLevel`.
-   - Add the new enum value to `ScreenID.h`.
-   
  --- AI Assistance Declaration ---
 AI tools (CoPilot/ChatGPT/Gemini) were used for development support:
 - Generating initial class skeletons (Getters/Setters).
@@ -96,6 +116,9 @@ AI tools (CoPilot/ChatGPT/Gemini) were used for development support:
 - Designing ASCII art for the Victory/Start screens.
 - Refactoring code into the `LevelLoader` and `GameException` classes.
 - Shuffle Riddles. 
-- Sound system.
+- Sound syste basic function
+-refactoring the 
+- Refactoring the Game engine to support Polymorphism (Base Game class splitting).
+- Implementing the Record/Replay logic (Catch-up mechanism for desync prevention).
 
 All code was manually reviewed, integrated, and tested by us.
