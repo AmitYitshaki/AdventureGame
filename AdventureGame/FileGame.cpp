@@ -106,7 +106,7 @@ void FileGame::endSession()
 
 void FileGame::handleSleep() {
     if (isSilent) return; // Silent = מקסימום ביצועים
-    Sleep(TICK_MS);       // Load = מהירות רגילה
+    Sleep(TICK_MS/4);       // Load = מהירות רגילה
 }
 
 void FileGame::outputGraphics() {
