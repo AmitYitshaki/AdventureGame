@@ -13,8 +13,10 @@
 #include <windows.h>
 #include <memory> 
 #include <cctype>
-#include <thread> // <--- ADDED for non-blocking sound
+#include <thread>
 #include <deque>
+#include <iostream>
+#include <conio.h>
 
 // =============================================================
 //                     PROJECT INCLUDES
@@ -23,13 +25,13 @@
 #include "ScreenID.h"
 #include "Utils.h"
 #include "Point.h"
-
 #include "GameObject.h"
 #include "Screen.h"
 #include "Player.h"
 #include "LevelLoader.h"
 #include "GameException.h"
 
+// Game Objects
 #include "Bomb.h"
 #include "Key.h"
 #include "Door.h"
@@ -40,125 +42,124 @@
 #include "Switch.h"
 #include "Laser.h"
 
-enum class RunMode {
-    Normal,
-    Save,   // Recording input
-    Load,   // Replaying input visually
-    Silent  // Replaying input without visuals (Testing)
-};
-
+// מבנה עזר לאירועים (נשאר כמו שהיה)
 struct GameEvent {
     long cycle;
-    std::string type;    // e.g., "SCREEN_CHANGE", "LIFE_LOST"
-    std::string details; // e.g., "P1 ROOM2", "CORRECT"
+    std::string type;
+    std::string details;
 };
 
+// =============================================================
+//               BASE CLASS: Game (Abstract)
+// =============================================================
 class Game
 {
 public:
     Game();
-    Game(RunMode mode = RunMode::Normal);
-    ~Game();
+    virtual ~Game();
 
+    // מחיקת העתקות למניעת באגים
     Game(const Game&) = delete;
     Game& operator=(const Game&) = delete;
 
+    // הפונקציה הראשית שמפעילה את המשחק
     void start();
 
-    // Made public static so other classes (Player, Door) can trigger sounds easily
+    // סטטי כדי שיהיה נגיש לכולם
     static void playSound(int frequency, int duration);
+    static void setStatusMessage(const std::string& msg);
 
-private:
-    // --- Core Loop ---
+protected:
+    // === VIRTUAL INTERFACE (החלק הפולימורפי) ===
+    // כל יורש חייב לממש איך הוא מביא את התו הבא (מהמקלדת או מהקובץ)
+    virtual char getNextChar() = 0;
+
+    // כל יורש מטפל בדיווחים אחרת (כתיבה לקובץ או אימות מול צפי)
+    virtual void handleEventReport(const std::string& type, const std::string& details) = 0;
+
+    // אתחול ספציפי (תפריט במקלדת, טעינת קבצים בקובץ)
+    virtual void initSession() = 0;
+
+    // סיום ספציפי (סגירת הקלטה, הדפסת דוח מבחן)
+    virtual void endSession() = 0;
+
+    // ניהול זמן (FileGame ידרוס את זה ב-Silent כדי לרוץ מהר)
+    virtual void handleSleep();
+
+    // ציור (FileGame ידרוס את זה ב-Silent כדי לא לצייר)
+    virtual void outputGraphics();
+
+protected:
+    // === COMMON LOGIC (פונקציות עזר משותפות) ===
     void update();
-    void draw();
+    void draw(); // הציור הפיזי לבאפר
     void handleInput();
     void initGame();
     void resetGame();
     void end() { isRunning = false; }
 
-    // --- Memory Management ---
-    void cleanupDeadObjects(); // <--- NEW: Garbage Collector
+    // עטיפה לדיווח שקוראת לפונקציה הוירטואלית
+   virtual void reportEvent(const std::string& type, const std::string& details);
 
-    // --- UI Helpers ---
+    // --- Helpers (אותן פונקציות שהיו לך קודם) ---
+    void cleanupDeadObjects();
+    void processPlayerMovement(Player& p, Player* other);
+    void handleInteractions();
+    void checkGameStatus();
+    void handleFlowControl();
+
+    // --- Specific Mechanics ---
+    void updateBombs();
+    void visualizeExplosion(int cx, int cy, int radius);
+    void applyBombEffects(int cx, int cy, Screen& curr_screen, int R);
+    void explodeCell(int x, int y, Screen& screen);
+    void checkLevelTransition();
+    void goToScreen(ScreenId id);
+    void gameOverScreen(const std::string& message);
+    void restartCurrentLevel();
+    void pauseScreen(); // שים לב: זה יצטרך שינוי קטן ב-cpp כדי להשתמש ב-getNextChar
+
+    // --- Riddles ---
+    void handleRiddleInput(char key);
+    void startRiddle(Riddle* riddle, Player& p);
+    void loadRiddlesFromFile(const std::string& filename);
+    void assignRiddlesToLevel();
+    bool checkPlayerHasRiddle();
+    const RiddleData* getRiddleDataById(int id) const;
+
+    // --- Save/Load Game State ---
+    void saveGameState(const std::string& filename);
+    void loadGameState(const std::string& filename);
+    GameObject* createObjectFromSave(const std::string& type, std::stringstream& ss);
+    GameObject* findObjectAt(int x, int y);
+
+    // --- Drawing Internals ---
     std::vector<std::string> initBuffer();
     void writeToBuffer(std::vector<std::string>& buffer, int x, int y, char c);
     void writeHudText(std::vector<std::string>& buffer, int x, int y, const std::string& text);
     void renderBuffer(const std::vector<std::string>& buffer);
-
-    // --- Drawing Components ---
-    void drawLegendToBuffer(std::vector<std::string>& buffer);
     void drawObjectsToBuffer(std::vector<std::string>& buffer);
     void drawPlayersToBuffer(std::vector<std::string>& buffer);
+    void drawLegendToBuffer(std::vector<std::string>& buffer);
     void drawStatusMessageAt(std::vector<std::string>& buffer, int x, int y, int maxWidth);
     void drawRiddle(std::vector<std::string>& buffer);
     void drawHomeMessage(std::vector<std::string>& buffer);
     void applyLighting(std::vector<std::string>& buffer);
+    int resolveColor(char c, int x, int y);
+    void setConsoleColor(int colorCode);
+    int getColorForChar(char c);
+    void ChangeDirection(char c);
+    void stopMovement();
 
-    // --- Color System ---
     void toggleColor() { colorEnabled = !colorEnabled; }
     void toggleSound() { soundEnabled = !soundEnabled; }
     bool isColorEnabled() const { return colorEnabled; }
-    static bool isSoundEnabled(); 
-    void setConsoleColor(int colorCode);
-    int getColorForChar(char c);
-    int resolveColor(char c, int x, int y);
+    static bool isSoundEnabled();
 
-    // --- Logic & Mechanics ---
-    void ChangeDirection(char c);
-    void handleRiddleInput(char key);
-    void stopMovement();
-    bool checkPlayerHasRiddle();
-    void checkLevelTransition();
-    void gameOverScreen(const std::string& message);
-    void restartCurrentLevel();
-    void startRiddle(Riddle* riddle, Player& p);
-    void loadRiddlesFromFile(const std::string& filename);
-    void assignRiddlesToLevel();
-    void goToScreen(ScreenId id);
-    void pauseScreen();
-    void explodeCell(int x, int y, Screen& screen);
-    void visualizeExplosion(int cx, int cy, int radius);
-    void updateBombs();
-    void applyBombEffects(int cx, int cy, Screen& curr_screen, int R);
-    void safeDeleteObject(GameObject* objToRemove);
-
-    // --- Recording & Playback Implementation ---
-    void initFiles();              // שיניתי את השם מ-initStepsFile כי זה מטפל גם ב-results
-    void closeFiles();             // פונקציה חדשה לסגירה ודיווח
-
-    void recordInput(char key);
-    char getRecordedInput();
-
-    // ניהול תוצאות
-    void loadExpectedResults();    // טעינת קובץ התוצאות לזיכרון
-    void reportEvent(const std::string& type, const std::string& details); // דיווח מרכזי
-    void verifyEvent(const std::string& type, const std::string& details); // אימות מול הצפי
-
-    // --- Update Helpers (Refactoring) ---
-    void processPlayerMovement(Player& p, Player* other); // מטפל בלולאת המהירות
-    void handleInteractions();                            // מטפל בחידות ואינטראקציות
-    void checkGameStatus();                               // בודק חיים ו-Game Over
-    void handleFlowControl();                             // מטפל ב-Restart/Exit
-    void checkPlaybackStatus();                           // מטפל בסיום הקלטה
-
-    // --- Save/Load System ---
-    void saveGameState(const std::string& filename);
-    void loadGameState(const std::string& filename);
-    // Helper to find an object at specific coords (for re-linking items)
-    GameObject* findObjectAt(int x, int y);
-    // Factory: Creates an object from a text line
-    GameObject* createObjectFromSave(const std::string& type, std::stringstream& ss);
-
-    const RiddleData* getRiddleDataById(int id) const;
-
-public:
-    static void setStatusMessage(const std::string& msg);
-
-private:
+protected:
+    // === SHARED DATA MEMBERS ===
     static constexpr int TICK_MS = 64;
-    const std::string SAVE_FILENAME = "savegame.sav";
-	static constexpr ScreenId FINAL_LEVEL = ScreenId::ROOM4; // <---------------- if adding more levels, change this
+    static constexpr ScreenId FINAL_LEVEL = ScreenId::ROOM4;
 
     Player player1;
     Player player2;
@@ -167,37 +168,78 @@ private:
     std::vector<GameObject*> gameObjects;
 
     bool isRunning = true;
+    unsigned long cycleCounter = 0;
+    unsigned int randomSeed = 0;
+    bool isGameSessionActive = false; // האם אנחנו בתוך משחק פעיל
+
+    // Flags
     bool RiddleMode = false;
     Riddle* currentRiddle = nullptr;
     Player* currentRiddlePlayer = nullptr;
     std::vector<RiddleData> riddlesPool;
-
-    // Flags
     bool exitToMainMenu = false;
     bool pendingRestart = false;
     bool colorEnabled = true;
-    static bool soundEnabled; // Changed to static
-
+    static bool soundEnabled;
     static std::string statusMessage;
+};
 
-	// Recording & Playback
-    RunMode currentMode;
-    unsigned long cycleCounter = 0; // The game "Time"
-    unsigned int randomSeed = 0;
+// =============================================================
+//               DERIVED CLASS: KeyBoardGame
+// =============================================================
+// אחראית על משחק אינטראקטיבי ועל הקלטה (Save Mode)
+class KeyBoardGame : public Game
+{
+public:
+    KeyBoardGame(bool recordMode = false);
+    virtual ~KeyBoardGame();
 
-    bool isGameSessionActive = false; // האם אנחנו בתוך משחק פעיל (לא תפריט)
-    void startRecordingSession();     // התחלת הקלטה/ניגון (איפוס שעון ופתיחת קבצים)
-    void stopRecordingSession();      // סיום הקלטה (סגירת קבצים)
+protected:
+    // מימושים וירטואליים
+    virtual char getNextChar() override;
+    virtual void handleEventReport(const std::string& type, const std::string& details) override;
+    virtual void initSession() override;
+    virtual void endSession() override;
 
+private:
+    bool isRecording;
     std::ofstream stepsFileOut;
+    std::ofstream resultFileOut;
+};
+
+// =============================================================
+//               DERIVED CLASS: FileGame
+// =============================================================
+// אחראית על ניגון הקלטות ועל בדיקות אוטומטיות (Load/Silent Mode)
+class FileGame : public Game
+{
+public:
+    FileGame(bool silentMode = false);
+    virtual ~FileGame();
+
+protected:
+    // מימושים וירטואליים
+    virtual char getNextChar() override;
+    virtual void handleEventReport(const std::string& type, const std::string& details) override;
+    virtual void initSession() override;
+    virtual void endSession() override;
+
+    // דריסות מיוחדות למצב Silent
+    virtual void handleSleep() override;
+    virtual void outputGraphics() override;
+
+private:
+    void loadExpectedResults();
+    void verifyEvent(const std::string& type, const std::string& details);
+
+private:
+    bool isSilent;
     std::ifstream stepsFileIn;
     std::vector<std::pair<long, char>> stepsBuffer;
     size_t playbackIndex = 0;
 
-    // === NEW: Result File Handling ===
-    std::ofstream resultFileOut;           // לכתיבת תוצאות (Save Mode)
-    std::deque<GameEvent> expectedResults; // לאימות תוצאות (Load/Silent Mode)
-
+    // אימות תוצאות
+    std::deque<GameEvent> expectedResults;
     bool testFailed = false;
     std::string failureReason;
 };

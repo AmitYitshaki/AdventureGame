@@ -157,9 +157,11 @@ xcopy /y /d "$(ProjectDir)*.txt" "$(OutDir)"</Command>
   <ItemGroup>
     <ClCompile Include="Bomb.cpp" />
     <ClCompile Include="Door.cpp" />
+    <ClCompile Include="FileGame.cpp" />
     <ClCompile Include="Game.cpp" />
     <ClCompile Include="GameException.cpp" />
     <ClCompile Include="GameObject.cpp" />
+    <ClCompile Include="KeyBoardGame.cpp" />
     <ClCompile Include="Laser.cpp" />
     <ClCompile Include="LevelLoader.cpp" />
     <ClCompile Include="main.cpp" />

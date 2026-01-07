@@ -3,35 +3,28 @@
 #include <iostream>
 #include <cstdlib>
 
+// =============================================================
+//                    STATIC MEMBERS
+// =============================================================
 std::string Game::statusMessage = "";
 bool Game::soundEnabled = true; // Define static variable
 
 // =============================================================
-//                    CONSTRUCTOR & INIT
+//                    BASE CLASS: Game Implementation
 // =============================================================
 
-Game::Game(RunMode mode)
+Game::Game()
     : player1(0, 0, '$', 16),
     player2(0, 0, '&', 35),
     isRunning(true),
     currentScreen(nullptr),
-    currentMode(mode),   
-    cycleCounter(0)       
+    cycleCounter(0)
 {
     system("mode con: cols=80 lines=50");
-    if (currentMode == RunMode::Load || currentMode == RunMode::Silent) {
-    }
-    else {
-        randomSeed = (unsigned int)time(NULL);
-        srand(randomSeed);
-    }
     initGame();
 }
 
-Game::~Game()
-{
-    closeFiles();
-
+Game::~Game() {
     for (auto obj : gameObjects) delete obj;
     gameObjects.clear();
 }
@@ -88,50 +81,41 @@ void Game::resetGame()
     goToScreen(ScreenId::ROOM1);
 }
 
+// === MAIN LOOP ===
 void Game::start()
 {
     hideCursor();
 
-    // === לוגיקה לדילוג על תפריט בטסטים ===
-    if (currentMode == RunMode::Load || currentMode == RunMode::Silent) {
-        // בטסטים מתחילים מיד את המשחק
-        startRecordingSession();
-        resetGame(); // מתחיל את שלב 1
-    }
-    else {
-        // במשחק רגיל מציגים תפריט
-        goToScreen(ScreenId::HOME);
-    }
+    // 1. אתחול ספציפי (וירטואלי) - תפריט או טעינת קובץ
+    initSession();
 
     while (isRunning)
     {
+        // 2. קלט (וירטואלי) - מהמקלדת או מהקובץ
         handleInput();
+
+        // 3. לוגיקה
         update();
-        draw();
 
-        // ניהול זמנים
-        if (currentMode == RunMode::Silent) {
-            // מקסימום מהירות
-        }
-        else if (currentMode == RunMode::Load) {
-            Sleep(TICK_MS / 3);
-        }
-        else {
-            Sleep(TICK_MS);
-        }
+        // 4. גרפיקה (וירטואלי) - FileGame ב-Silent ידלג
+        outputGraphics();
+
+        // 5. זמן (וירטואלי) - FileGame ב-Silent לא יישן
+        handleSleep();
     }
 
-    // וידוא סגירה ביציאה מהתוכנית
-    stopRecordingSession();
+    // 6. סיום (וירטואלי)
+    endSession();
+
     cls();
+}
 
-    // הדפסת תוצאות טסט ביציאה (רק ל-Silent)
-    if (currentMode == RunMode::Silent) {
-        if (testFailed) std::cout << "Test Failed: " << failureReason << std::endl;
-        else std::cout << "Test Passed" << std::endl;
-        std::cout << "Press any key...";
-        _getch();
-    }
+void Game::handleSleep() {
+    Sleep(TICK_MS);
+}
+
+void Game::outputGraphics() {
+    draw();
 }
 
 void Game::restartCurrentLevel()
@@ -209,29 +193,19 @@ void Game::gameOverScreen(const std::string& message)
     printCentered(6, "[R] Restart Level    [H] Main Menu");
 
     // --- הלולאה ---
-    while (true) {
-        char key = 0;
+    while (isRunning) {
+        // שימוש בפולימורפיזם: המחשב יחליט אם לקחת מקש מהמקלדת או מהקובץ
+        char key = getNextChar();
 
-        if (currentMode == RunMode::Load || currentMode == RunMode::Silent) {
-            key = getRecordedInput();
-            if (key == 0) {
-                isRunning = false;
-                return;
-            }
-        }
-        else {
-            if (_kbhit()) {
-                key = _getch();
-                if (currentMode == RunMode::Save) {
-                    recordInput(key);
-                }
-            }
-        }
+        // ב-FileGame, אם נגמרו הצעדים, isRunning יהפוך ל-false.
+        // אנחנו חייבים לבדוק את זה כדי לצאת מהלולאה.
+        if (!isRunning) return;
+
+        if (key == 0) continue; // לא נלחץ כלום, ממשיכים לחכות
 
         // [R] Restart Level
         if (key == 'R' || key == 'r') {
-            // הערה: בריסטרט של שלב אנחנו בדרך כלל ממשיכים את אותה הקלטה,
-            // כי זה חלק מאותו סשן משחק. אז לא עוצרים כאן את ההקלטה.
+            // בריסטרט אנחנו ממשיכים את אותו סשן, אז לא סוגרים קבצים
             pendingRestart = true;
             return;
         }
@@ -239,22 +213,12 @@ void Game::gameOverScreen(const std::string& message)
         // [H] Exit to Main Menu
         else if (key == 'H' || key == 'h') {
 
-            reportEvent("GAME_ENDED", "User Quit from Game Over"); // דיווח סופי
+            reportEvent("GAME_ENDED", "User Quit from Game Over");
 
-            // === התיקון: סגירת ההקלטה בחזרה לתפריט ===
-            stopRecordingSession();
-            // =========================================
-            if (currentMode == RunMode::Load || currentMode == RunMode::Silent) {
-                isRunning = false; // הורג את הלולאה הראשית
-                return;            // יוצא מהפונקציה
-            }
+            // סגירת הסשן (סגירת קבצים ב-KeyBoard, הדפסת דוח ב-FileGame)
+            endSession();
 
-            // בטסטים - יציאה לתפריט מסיימת את התוכנית
-            if (currentMode == RunMode::Load || currentMode == RunMode::Silent) {
-                isRunning = false;
-                return;
-            }
-
+            // סימון ליציאה לתפריט (הלולאה הראשית ב-start תטפל בזה)
             exitToMainMenu = true;
             return;
         }
@@ -282,215 +246,52 @@ void Game::cleanupDeadObjects()
 }
 
 // =============================================================
-//               FILE HANDLING (RECORDING SYSTEM)
-// =============================================================
-
-void Game::initFiles() // החלף את initStepsFile בזה
-{
-    // === מצב SAVE: פתיחת שני הקבצים לכתיבה ===
-    if (currentMode == RunMode::Save)
-    {
-        stepsFileOut.open("adv-world.steps");
-        resultFileOut.open("adv-world.result"); // פתיחת קובץ התוצאות
-
-        if (!stepsFileOut || !resultFileOut) {
-            throw GameException("Could not create record files!", "Game::initFiles");
-        }
-        stepsFileOut << "SEED: " << randomSeed << std::endl;
-    }
-    // === מצב LOAD/SILENT: קריאת צעדים + תוצאות ===
-    else if (currentMode == RunMode::Load || currentMode == RunMode::Silent)
-    {
-        stepsFileIn.open("adv-world.steps");
-        if (!stepsFileIn) return; // אולי אין קובץ, לא נכשלים על זה
-
-        std::string header;
-        stepsFileIn >> header >> randomSeed;
-        if (header != "SEED:") throw GameException("Invalid steps format", "Game::initFiles");
-
-        srand(randomSeed); // שחזור הרנדומליות
-
-        long t; char k;
-        while (stepsFileIn >> t >> k) {
-            stepsBuffer.push_back({ t, k });
-        }
-        stepsFileIn.close();
-
-        loadExpectedResults(); // טעינת הצפי לקובץ התוצאות
-    }
-}
-
-void Game::loadExpectedResults()
-{
-    std::ifstream resIn("adv-world.result");
-    if (!resIn) return;
-
-    long t;
-    std::string type;
-    while (resIn >> t >> type) {
-        std::string details;
-        std::getline(resIn, details);
-        // ניקוי רווח בהתחלה שנוצר מ-getline
-        if (!details.empty() && details[0] == ' ') details.erase(0, 1);
-        expectedResults.push_back({ t, type, details });
-    }
-    resIn.close();
-}
-
-void Game::closeFiles()
-{
-    if (stepsFileOut.is_open()) stepsFileOut.close();
-    if (resultFileOut.is_open()) resultFileOut.close();
-
-    // במצב שקט, מדפיסים בסוף אם הטסט עבר
-    if (currentMode == RunMode::Silent) {
-        if (testFailed) {
-            std::cout << "Test Failed: " << failureReason << std::endl;
-        }
-        else if (!expectedResults.empty()) {
-            std::cout << "Test Failed: Game ended but missed expected events." << std::endl;
-        }
-        else {
-            std::cout << "Test Passed" << std::endl;
-        }
-        // כדי שיראו את התוצאה לפני שהחלון נסגר
-        std::cout << "Press any key to exit...";
-        _getch();
-    }
-}
-
-void Game::recordInput(char key)
-{
-    // אם אנחנו בתפריט או לא בסשן פעיל - לא מקליטים!
-    if (!isGameSessionActive) return;
-
-    if (currentMode == RunMode::Save && stepsFileOut.is_open()) {
-        stepsFileOut << cycleCounter << " " << key << std::endl;
-    }
-}
-
-// שליפת קלט בזמן ריצה אוטומטית
-char Game::getRecordedInput()
-{
-    // אם נגמרו הצעדים, אין קלט
-    if (playbackIndex >= stepsBuffer.size()) return 0;
-
-    // בדיקה האם הגענו לזמן (Cycle) של הפקודה הבאה
-    // stepsBuffer[playbackIndex].first מחזיק את ה-Cycle
-    if (stepsBuffer[playbackIndex].first == cycleCounter) {
-        char key = stepsBuffer[playbackIndex].second;
-        playbackIndex++;
-        return key;
-    }
-    return 0;
-}
-
-void Game::reportEvent(const std::string& type, const std::string& details)
-{
-    // 1. שמירה לקובץ (בזמן הקלטה)
-    if (currentMode == RunMode::Save && resultFileOut.is_open()) {
-        resultFileOut << cycleCounter << " " << type << " " << details << std::endl;
-    }
-
-    // 2. בדיקה מול הצפי (בזמן הרצה אוטומטית)
-    if (currentMode == RunMode::Load || currentMode == RunMode::Silent) {
-        verifyEvent(type, details);
-    }
-}
-
-void Game::verifyEvent(const std::string& type, const std::string& details)
-{
-    if (testFailed) return;
-
-    if (expectedResults.empty()) {
-        testFailed = true;
-        failureReason = "Unexpected event: " + type + " (Expected nothing)";
-        isRunning = false; // עצירת הריצה כי נכשלנו
-        return;
-    }
-
-    GameEvent expected = expectedResults.front();
-    expectedResults.pop_front();
-
-    // השוואה: מאפשרים סטייה קלה של 1-2 טיקים בזמן (לפעמים קורה בגלל סדר פעולות)
-    long timeDiff = std::abs(expected.cycle - (long)cycleCounter);
-
-    if (timeDiff > 2 || expected.type != type || expected.details != details) {
-        testFailed = true;
-        failureReason = "Mismatch! Exp: [" + std::to_string(expected.cycle) + " " + expected.type + " " + expected.details + "] " +
-            "Got: [" + std::to_string(cycleCounter) + " " + type + " " + details + "]";
-        isRunning = false;
-    }
-}
-
-// =============================================================
 //                     CORE GAME LOOP UPDATES
 // ============================================================
 
 void Game::update()
 {
-    // 1. קידום זמן (קריטי להקלטות)
-    cycleCounter++;
+    cycleCounter++; // קידום זמן תמיד קורה כאן
 
-    // 2. תנועת שחקנים ופיזיקה
     processPlayerMovement(player1, &player2);
     processPlayerMovement(player2, &player1);
 
-    // עדכון אפקטים (קפיצים)
     if (player1.isFlying()) player1.updateSpringEffect();
     if (player2.isFlying()) player2.updateSpringEffect();
 
-    updateBombs(); // עדכון פצצות
+    updateBombs();
 
-    // 3. אינטראקציות ומעברים
     if (currentScreen->getScreenId() != ScreenId::HOME &&
         currentScreen->getScreenId() != ScreenId::INSTRUCTIONS)
     {
         checkLevelTransition();
     }
 
-    handleInteractions(); // הפעלת חידות אם נדרש
-
-    // 4. תחזוקה
+    handleInteractions();
     cleanupDeadObjects();
-
-    // 5. ניהול מצב משחק (ניצחון/הפסד/תפריטים)
     checkGameStatus();
     handleFlowControl();
-    checkPlaybackStatus();
-
-    // --- HOOKS FOR PART 2 (TESTING) ---
-    // checkResultEvents(); // כאן נכניס את בדיקת התוצאות בהמשך
 }
 
 void Game::handleInput()
 {
-	char key = 0;
-    if (currentMode == RunMode::Load || currentMode == RunMode::Silent)
-    {
-        key = getRecordedInput(); // משיכה מהבאפר האוטומטי
-    }
-    else
-    {
-        if (!_kbhit()) return;
-        key = _getch();
-        if (currentMode == RunMode::Save) {
-			if (RiddleMode && key == 27)  //to prevent recording ESC key during riddle mode
-                return;
-            recordInput(key);
-        }
-    }
-	if (key == 0) return; // אין קלט זמינים
+    // === הקסם הפולימורפי ===
+    // אנחנו מבקשים את התו הבא. לא מעניין אותנו מאיפה הוא בא.
+    char key = getNextChar();
+
+    if (key == 0) return;
+
+    // --- לוגיקת משחק רגילה ---
 
     if (RiddleMode && currentRiddle) {
         handleRiddleInput(key);
         return;
     }
 
+    // תפריט ראשי
     if (currentScreen == &screens[(int)ScreenId::HOME]) {
         if (key == '1') {
-            playSound(600, 100); // Start Game Sound
-            startRecordingSession();
+            playSound(600, 100);
             resetGame();
             return;
         }
@@ -498,62 +299,42 @@ void Game::handleInput()
         if (key == '3') {
             try {
                 resetGame();
-                loadGameState(SAVE_FILENAME);
-
+                loadGameState("savegame.sav");
                 setStatusMessage("Game Loaded Successfully!");
                 playSound(1000, 200);
-                return;
             }
-            catch (const std::exception& e) {
+            catch (const std::exception&) {
                 setStatusMessage("Load Failed! Started New Game instead.");
-                playSound(200, 300);
             }
             return;
-		}
-        if (key == 'q' || key == 'Q') { end(); reportEvent("GAME_ENDED", "Score: " + std::to_string(player1.getScore() + player2.getScore()));  return; }
-        if (key == 'c' || key == 'C') {
-            toggleColor();
-            setStatusMessage(isColorEnabled() ? "Color: ON" : "Color: OFF");
-            draw(); return;
         }
-        if (key == 's' || key == 'S') {
-            toggleSound();
-            setStatusMessage(isSoundEnabled() ? "Sound: ON" : "Sound: OFF");
-            if (isSoundEnabled()) playSound(400, 100);
-            return;
-        }
+        if (key == 'q' || key == 'Q') { end(); reportEvent("GAME_ENDED", "Score: " + std::to_string(player1.getScore() + player2.getScore())); return; }
+        if (key == 'c' || key == 'C') { toggleColor(); setStatusMessage(isColorEnabled() ? "Color: ON" : "Color: OFF"); outputGraphics(); return; }
+        if (key == 's' || key == 'S') { toggleSound(); setStatusMessage(isSoundEnabled() ? "Sound: ON" : "Sound: OFF"); if (isSoundEnabled()) playSound(400, 100); return; }
     }
 
-    if (currentScreen == &screens[(int)ScreenId::ROOM4]) {
-        if (key == '1') { resetGame(); }
-        else if (key == 'h' || key == 'H') { 
+    // יציאה ממסכים מיוחדים
+    if (currentScreen->getScreenId() == ScreenId::ROOM4 || currentScreen->getScreenId() == ScreenId::INSTRUCTIONS) {
+        if (key == '1' && currentScreen->getScreenId() == ScreenId::ROOM4) { resetGame(); }
+        else if (key == 'h' || key == 'H') {
             reportEvent("GAME_ENDED", "User Quit to Menu");
-            stopRecordingSession();
-            if (currentMode == RunMode::Load || currentMode == RunMode::Silent) {
-                isRunning = false; // הורג את הלולאה הראשית
-                return;            // יוצא מהפונקציה
-            }
-            goToScreen(ScreenId::HOME); setStatusMessage(""); }
+            goToScreen(ScreenId::HOME);
+            setStatusMessage("");
+        }
         else if (key == 'q' || key == 'Q') { end(); }
         return;
-    }
-
-    if (currentScreen == &screens[(int)ScreenId::INSTRUCTIONS] && (key == 'h' || key == 'H')) {
-        reportEvent("GAME_ENDED", "User Quit to Menu");
-        stopRecordingSession();
-        if (currentMode == RunMode::Load || currentMode == RunMode::Silent) {
-            isRunning = false; // הורג את הלולאה הראשית
-            return;            // יוצא מהפונקציה
-		}
-        goToScreen(ScreenId::HOME); return;
     }
 
     if (key == 27) { pauseScreen(); return; }
 
     ChangeDirection(key);
-
     if (key == 'E' || key == 'e') player1.dropItemToScreen(currentScreen->getScreenId());
     else if (key == 'O' || key == 'o') player2.dropItemToScreen(currentScreen->getScreenId());
+}
+
+// פונקציית מעטפת לדיווח - מעבירה את העבודה לבנים
+void Game::reportEvent(const std::string& type, const std::string& details) {
+    handleEventReport(type, details);
 }
 
 std::vector<std::string> Game::initBuffer()
@@ -708,7 +489,6 @@ void Game::renderBuffer(const std::vector<std::string>& buffer)
 
 void Game::draw()
 {
-    if (currentMode == RunMode::Silent) return;
     auto buffer = initBuffer();
     drawObjectsToBuffer(buffer);
     drawPlayersToBuffer(buffer);
@@ -1008,11 +788,9 @@ void Game::assignRiddlesToLevel()
 
 void Game::pauseScreen()
 {
-    // חישוב המיקום למרכז המסך
     int x = (Screen::WIDTH - 37) / 2;
     int y = (Screen::HEIGHT - 6) / 2;
 
-    // ציור המסגרת והתפריט
     gotoxy(x, y);     std::cout << "*************************************";
     gotoxy(x, y + 1); std::cout << "* GAME PAUSED                       *";
     gotoxy(x, y + 2); std::cout << "*                                   *";
@@ -1021,79 +799,28 @@ void Game::pauseScreen()
     gotoxy(x, y + 5); std::cout << "* [H]   Exit to Main Menu           *";
     gotoxy(x, y + 6); std::cout << "*************************************";
 
-    // לולאת הקלט של התפריט
     while (true) {
-        char key = 0;
+        // גם כאן - שימוש ב-getNextChar הוירטואלי!
+        char key = getNextChar();
 
-        // === 1. קריאת קלט (אוטומטי או ידני) ===
-        if (currentMode == RunMode::Load || currentMode == RunMode::Silent) {
-            key = getRecordedInput(); // שואב את המקש מההקלטה
+        if (key == 0) continue;
 
-            // הגנה: אם נגמרו הצעדים בקובץ ואין קלט, חייבים לצאת
-            if (key == 0) {
-                isRunning = false;
-                return;
-            }
-        }
-        else {
-            if (_kbhit()) {
-                key = _getch();
-                // אם אנחנו במצב הקלטה, שומרים גם את הפעולות בתוך ה-Pause
-                if (currentMode == RunMode::Save) {
-                    recordInput(key);
-                }
-            }
-        }
+        if (key == 27) return; // ESC
 
-        if (key == 0) continue; // לא נלחץ כלום
-
-        // === 2. לוגיקת מקשים ===
-
-        // [ESC] חזרה למשחק
-        if (key == 27) {
-            return;
-        }
-
-        // [S] שמירת מצב
         if (key == 's' || key == 'S') {
-
-            // הגנה: חסימת שמירה בזמן הקלטה כדי לא לשבור את רצף הצעדים
-            if (currentMode == RunMode::Save) {
-                gotoxy(x + 2, y + 2);
-                std::cout << " Recording Mode: Save Disabled ";
-                Sleep(1000);
-                gotoxy(x + 2, y + 2);
-                std::cout << "                               "; // מחיקת ההודעה
-                continue;
-            }
-
             try {
                 saveGameState("savegame.sav");
-
-                gotoxy(x + 2, y + 2);
-                std::cout << "      Game Saved Successfully!     ";
-
-                // בטעינה אוטומטית אין צורך להמתין
-                if (currentMode != RunMode::Silent) {
-                    Sleep(1000);
-                }
-                return; // חוזרים למשחק אחרי השמירה
+                gotoxy(x + 2, y + 2); std::cout << "      Game Saved Successfully!     ";
+                handleSleep(); // שימוש בשינה וירטואלית
+                return;
             }
-            catch (const std::exception& e) {
+            catch (...) {
                 setStatusMessage("Save Failed!");
             }
         }
 
-        // [H] יציאה לתפריט ראשי
         if (key == 'h' || key == 'H') {
-
             reportEvent("GAME_ENDED", "User Quit to Menu");
-			stopRecordingSession();
-            if (currentMode == RunMode::Load || currentMode == RunMode::Silent) {
-                isRunning = false; // הורג את הלולאה הראשית
-                return;            // יוצא מהפונקציה
-			}
-            // יציאה רגילה לתפריט
             goToScreen(ScreenId::HOME);
             setStatusMessage("");
             return;
@@ -1176,26 +903,8 @@ void Game::explodeCell(int x, int y, Screen& screen)
 }
 
 
-void Game::safeDeleteObject(GameObject* objToRemove)
-{
-    // Deprecated in favor of cleanupDeadObjects, but kept for legacy
-    if (!objToRemove) return;
-    if (player1.isHoldingItem(objToRemove)) player1.forceDropItem();
-    if (player2.isHoldingItem(objToRemove)) player2.forceDropItem();
-
-    auto it = std::remove(gameObjects.begin(), gameObjects.end(), objToRemove);
-    if (it == gameObjects.end()) return;
-
-    gameObjects.erase(it, gameObjects.end());
-    delete objToRemove;
-}
-
 void Game::visualizeExplosion(int cx, int cy, int radius)
 {
-    // === תיקון: במצב שקט אסור לצייר ואסור לישון ===
-    if (currentMode == RunMode::Silent) return;
-    // ==============================================
-
     for (int y = cy - radius; y <= cy + radius; ++y) {
         for (int x = cx - radius; x <= cx + radius; ++x) {
             if (x >= 0 && x < Screen::WIDTH && y >= 0 && y < Screen::HEIGHT) {
@@ -1207,7 +916,9 @@ void Game::visualizeExplosion(int cx, int cy, int radius)
         }
     }
     gotoxy(0, 0);
-    Sleep(2 * TICK_MS);
+    // השתמש ב-handleSleep הוירטואלי פעמיים במקום Sleep רגיל
+    handleSleep();
+    handleSleep();
 }
 
 void Game::processPlayerMovement(Player& p, Player* other)
@@ -1269,19 +980,6 @@ void Game::handleFlowControl()
         resetGame();
         goToScreen(ScreenId::HOME);
         return;
-    }
-}
-
-void Game::checkPlaybackStatus()
-{
-    // בדיקה האם סיימנו לנגן את קובץ ההקלטה
-    if ((currentMode == RunMode::Load || currentMode == RunMode::Silent) &&
-        playbackIndex >= stepsBuffer.size())
-    {
-        if (currentMode == RunMode::Silent) {
-            isRunning = false; // בטסט שקט יוצאים מיד
-        }
-        // בטעינה ויזואלית משאירים את המשחק פתוח
     }
 }
 
@@ -1548,60 +1246,4 @@ GameObject* Game::findObjectAt(int x, int y)
         }
     }
     return nullptr;
-}
-
-void Game::startRecordingSession()
-{
-    isGameSessionActive = true;
-    cycleCounter = 0; // חשוב מאוד: איפוס הזמן לתחילת המשחק
-
-    // === מצב SAVE: פתיחת קבצים לכתיבה (דריסה) ===
-    if (currentMode == RunMode::Save)
-    {
-        stepsFileOut.open("adv-world.steps", std::ios::trunc);
-        resultFileOut.open("adv-world.result", std::ios::trunc);
-
-        if (!stepsFileOut || !resultFileOut) {
-            throw GameException("Could not create record files!", "Game::startRecordingSession");
-        }
-        // כתיבת ה-Seed לתחילת הקובץ
-        stepsFileOut << "SEED: " << randomSeed << std::endl;
-    }
-    // === מצב LOAD/SILENT: פתיחת קבצים לקריאה ===
-    else if (currentMode == RunMode::Load || currentMode == RunMode::Silent)
-    {
-        stepsFileIn.open("adv-world.steps");
-        if (!stepsFileIn) return;
-
-        std::string header;
-        stepsFileIn >> header >> randomSeed; // קריאת ה-Seed מהקובץ
-        if (header != "SEED:") throw GameException("Invalid steps format", "Game::startRecordingSession");
-
-        srand(randomSeed); // שחזור הרנדומליות המדויקת
-
-        // טעינת הצעדים לזיכרון
-        stepsBuffer.clear();
-        playbackIndex = 0;
-        long t; char k;
-        while (stepsFileIn >> t >> k) {
-            stepsBuffer.push_back({ t, k });
-        }
-        stepsFileIn.close(); // סיימנו לקרוא, אפשר לסגור
-
-        loadExpectedResults(); // טעינת הצפי
-    }
-}
-
-void Game::stopRecordingSession()
-{
-    isGameSessionActive = false;
-
-    // סגירת קבצים
-    if (stepsFileOut.is_open()) stepsFileOut.close();
-    if (resultFileOut.is_open()) resultFileOut.close();
-
-    // ניקוי זיכרון של טסטים קודמים
-    expectedResults.clear();
-    testFailed = false;
-    failureReason = "";
 }
