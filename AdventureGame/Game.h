@@ -95,7 +95,7 @@ protected:
     void draw(); // הציור הפיזי לבאפר
     void handleInput();
     void initGame();
-    void resetGame();
+    virtual void resetGame();
     void end() { isRunning = false; }
 
     // עטיפה לדיווח שקוראת לפונקציה הוירטואלית
@@ -182,6 +182,11 @@ protected:
     bool colorEnabled = true;
     static bool soundEnabled;
     static std::string statusMessage;
+    // האם מותר לשמור/לטעון את מצב המשחק (State)?
+    virtual bool allowSaveLoad() const { return true; }
+
+    // האם אנחנו במצב שקט? (ברירת מחדל: לא)
+    virtual bool isSilentMode() const { return false; }
 };
 
 // =============================================================
@@ -200,7 +205,8 @@ protected:
     virtual void handleEventReport(const std::string& type, const std::string& details) override;
     virtual void initSession() override;
     virtual void endSession() override;
-
+    virtual bool allowSaveLoad() const override { return !isRecording; }
+    virtual void resetGame() override;
 private:
     bool isRecording;
     std::ofstream stepsFileOut;
@@ -223,10 +229,13 @@ protected:
     virtual void handleEventReport(const std::string& type, const std::string& details) override;
     virtual void initSession() override;
     virtual void endSession() override;
+    virtual bool isSilentMode() const override { return isSilent; }
+    virtual bool allowSaveLoad() const override { return false; }
 
     // דריסות מיוחדות למצב Silent
     virtual void handleSleep() override;
     virtual void outputGraphics() override;
+    
 
 private:
     void loadExpectedResults();

@@ -103,10 +103,6 @@ void Game::start()
         // 5. זמן (וירטואלי) - FileGame ב-Silent לא יישן
         handleSleep();
     }
-
-    // 6. סיום (וירטואלי)
-    endSession();
-
     cls();
 }
 
@@ -169,29 +165,29 @@ void Game::gameOverScreen(const std::string& message)
 
     playSound(100, 600);
     system("cls");
+    if (!isSilentMode()) {
+        // --- קוד הציור (ללא שינוי) ---
+        const int BOX_WIDTH = 50;
+        const int BOX_HEIGHT = 9;
+        int x = (Screen::WIDTH - BOX_WIDTH) / 2;
+        int y = (Screen::HEIGHT - BOX_HEIGHT) / 2;
 
-    // --- קוד הציור (ללא שינוי) ---
-    const int BOX_WIDTH = 50;
-    const int BOX_HEIGHT = 9;
-    int x = (Screen::WIDTH - BOX_WIDTH) / 2;
-    int y = (Screen::HEIGHT - BOX_HEIGHT) / 2;
+        auto printCentered = [&](int rowOffset, const std::string& text) {
+            int padding = (BOX_WIDTH - 2 - (int)text.length()) / 2;
+            gotoxy(x, y + rowOffset);
+            std::cout << "#" << std::string(padding, ' ') << text << std::string(BOX_WIDTH - 2 - padding - text.length(), ' ') << "#";
+            };
 
-    auto printCentered = [&](int rowOffset, const std::string& text) {
-        int padding = (BOX_WIDTH - 2 - (int)text.length()) / 2;
-        gotoxy(x, y + rowOffset);
-        std::cout << "#" << std::string(padding, ' ') << text << std::string(BOX_WIDTH - 2 - padding - text.length(), ' ') << "#";
-        };
+        gotoxy(x, y);     std::cout << std::string(BOX_WIDTH, '#');
+        for (int i = 1; i < BOX_HEIGHT - 1; ++i) {
+            gotoxy(x, y + i); std::cout << "#" << std::string(BOX_WIDTH - 2, ' ') << "#";
+        }
+        gotoxy(x, y + BOX_HEIGHT - 1); std::cout << std::string(BOX_WIDTH, '#');
 
-    gotoxy(x, y);     std::cout << std::string(BOX_WIDTH, '#');
-    for (int i = 1; i < BOX_HEIGHT - 1; ++i) {
-        gotoxy(x, y + i); std::cout << "#" << std::string(BOX_WIDTH - 2, ' ') << "#";
+        printCentered(2, "GAME OVER");
+        printCentered(4, message);
+        printCentered(6, "[R] Restart Level    [H] Main Menu");
     }
-    gotoxy(x, y + BOX_HEIGHT - 1); std::cout << std::string(BOX_WIDTH, '#');
-
-    printCentered(2, "GAME OVER");
-    printCentered(4, message);
-    printCentered(6, "[R] Restart Level    [H] Main Menu");
-
     // --- הלולאה ---
     while (isRunning) {
         // שימוש בפולימורפיזם: המחשב יחליט אם לקחת מקש מהמקלדת או מהקובץ
@@ -297,16 +293,21 @@ void Game::handleInput()
         }
         if (key == '2') { goToScreen(ScreenId::INSTRUCTIONS); return; }
         if (key == '3') {
-            try {
-                resetGame();
-                loadGameState("savegame.sav");
-                setStatusMessage("Game Loaded Successfully!");
-                playSound(1000, 200);
+            if (!allowSaveLoad()) {
+                setStatusMessage("Load disabled during recording/playback!");
             }
-            catch (const std::exception&) {
-                setStatusMessage("Load Failed! Started New Game instead.");
+            else {
+                try {
+                    resetGame();
+                    loadGameState("savegame.sav");
+                    setStatusMessage("Game Loaded Successfully!");
+                    playSound(1000, 200);
+                }
+                catch (const std::exception&) {
+                    setStatusMessage("Load Failed! Started New Game instead.");
+                }
+                return;
             }
-            return;
         }
         if (key == 'q' || key == 'Q') { end(); reportEvent("GAME_ENDED", "Score: " + std::to_string(player1.getScore() + player2.getScore())); return; }
         if (key == 'c' || key == 'C') { toggleColor(); setStatusMessage(isColorEnabled() ? "Color: ON" : "Color: OFF"); outputGraphics(); return; }
@@ -318,11 +319,10 @@ void Game::handleInput()
         if (key == '1' && currentScreen->getScreenId() == ScreenId::ROOM4) { resetGame(); }
         else if (key == 'h' || key == 'H') {
             reportEvent("GAME_ENDED", "User Quit to Menu");
+            endSession();
             goToScreen(ScreenId::HOME);
             setStatusMessage("");
         }
-        else if (key == 'q' || key == 'Q') { end(); }
-        return;
     }
 
     if (key == 27) { pauseScreen(); return; }
@@ -583,7 +583,7 @@ void Game::checkLevelTransition()
         reportEvent("SCREEN_CHANGE", "P1 to " + std::to_string((int)t1));
         player1.updatepoint(-1, -1);
     }
-    else if (t2 != real && t1 == real && player2.getX() != -1) {
+    if (t2 != real && t1 == real && player2.getX() != -1) {
         setStatusMessage("p2 change Room!");
         reportEvent("SCREEN_CHANGE", "P2 to " + std::to_string((int)t2));
         player2.updatepoint(-1, -1);
@@ -688,7 +688,7 @@ void Game::handleRiddleInput(char key)
         p.decreaseLife();
         reportEvent("LIFE_LOST", pName);
         setStatusMessage("Wrong! You lost a life.");
-        draw();
+        outputGraphics();
         if (p.getLive() <= 0) {
             RiddleMode = false;
             currentRiddle = nullptr;
@@ -790,15 +790,15 @@ void Game::pauseScreen()
 {
     int x = (Screen::WIDTH - 37) / 2;
     int y = (Screen::HEIGHT - 6) / 2;
-
-    gotoxy(x, y);     std::cout << "*************************************";
-    gotoxy(x, y + 1); std::cout << "* GAME PAUSED                       *";
-    gotoxy(x, y + 2); std::cout << "*                                   *";
-    gotoxy(x, y + 3); std::cout << "* [ESC] Continue                    *";
-    gotoxy(x, y + 4); std::cout << "* [S]   Save Current State          *";
-    gotoxy(x, y + 5); std::cout << "* [H]   Exit to Main Menu           *";
-    gotoxy(x, y + 6); std::cout << "*************************************";
-
+    if (!isSilentMode()) {
+        gotoxy(x, y);     std::cout << "*************************************";
+        gotoxy(x, y + 1); std::cout << "* GAME PAUSED                       *";
+        gotoxy(x, y + 2); std::cout << "*                                   *";
+        gotoxy(x, y + 3); std::cout << "* [ESC] Continue                    *";
+        gotoxy(x, y + 4); std::cout << "* [S]   Save Current State          *";
+        gotoxy(x, y + 5); std::cout << "* [H]   Exit to Main Menu           *";
+        gotoxy(x, y + 6); std::cout << "*************************************";
+    }
     while (true) {
         // גם כאן - שימוש ב-getNextChar הוירטואלי!
         char key = getNextChar();
@@ -808,19 +808,26 @@ void Game::pauseScreen()
         if (key == 27) return; // ESC
 
         if (key == 's' || key == 'S') {
-            try {
-                saveGameState("savegame.sav");
-                gotoxy(x + 2, y + 2); std::cout << "      Game Saved Successfully!     ";
-                handleSleep(); // שימוש בשינה וירטואלית
-                return;
+            if (!allowSaveLoad()) {
+                setStatusMessage("Save disabled during recording/playback!");
+                gotoxy(x + 2, y + 2); std::cout << "Save disabled during recording/playback!";
             }
-            catch (...) {
-                setStatusMessage("Save Failed!");
+            else {
+                try {
+                    saveGameState("savegame.sav");
+                    gotoxy(x + 2, y + 2); std::cout << "      Game Saved Successfully!     ";
+                    handleSleep(); // שימוש בשינה וירטואלית
+                    return;
+                }
+                catch (...) {
+                    setStatusMessage("Save Failed!");
+                }
             }
         }
 
         if (key == 'h' || key == 'H') {
             reportEvent("GAME_ENDED", "User Quit to Menu");
+            endSession();
             goToScreen(ScreenId::HOME);
             setStatusMessage("");
             return;
@@ -905,6 +912,7 @@ void Game::explodeCell(int x, int y, Screen& screen)
 
 void Game::visualizeExplosion(int cx, int cy, int radius)
 {
+    if (isSilentMode()) return;
     for (int y = cy - radius; y <= cy + radius; ++y) {
         for (int x = cx - radius; x <= cx + radius; ++x) {
             if (x >= 0 && x < Screen::WIDTH && y >= 0 && y < Screen::HEIGHT) {
