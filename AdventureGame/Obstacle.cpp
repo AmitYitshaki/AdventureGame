@@ -6,70 +6,108 @@
 #include "Game.h"
 #include <iostream>
 
-
-
+// === Construction ===
 Obstacle::Obstacle(const std::vector<Point>& tiles, ScreenId screenId)
-    : GameObject(tiles.empty() ? 0 : tiles.front().getX(), tiles.empty() ? 0 : tiles.front().getY(), '*', screenId, true, false), parts(tiles) {
+    : GameObject(tiles.empty() ? 0 : tiles.front().getX(),
+        tiles.empty() ? 0 : tiles.front().getY(),
+        '*',
+        screenId,
+        true,
+        false),
+    parts(tiles)
+{
 }
 
-bool Obstacle::isAtPosition(int x, int y) const {
-    for (const auto& part : parts) if (part.getX() == x && part.getY() == y) return true;
+// === Queries ===
+bool Obstacle::isAtPosition(int x, int y) const
+{
+    for (const auto& part : parts) {
+        if (part.getX() == x && part.getY() == y) {
+            return true;
+        }
+    }
     return false;
 }
 
-void Obstacle::drawToBuffer(std::vector<std::string>& buffer) const {
+// === Rendering ===
+void Obstacle::drawToBuffer(std::vector<std::string>& buffer) const
+{
     for (const auto& part : parts) {
-        int x = part.getX(); int y = part.getY();
-        if (y >= 0 && y < (int)buffer.size() && x >= 0 && x < (int)buffer[y].size()) buffer[y][x] = part.getChar();
+        int x = part.getX();
+        int y = part.getY();
+        if (y >= 0 && y < static_cast<int>(buffer.size())
+            && x >= 0 && x < static_cast<int>(buffer[y].size())) {
+            buffer[y][x] = part.getChar();
+        }
     }
 }
 
-bool Obstacle::handleExplosionAt(int x, int y) {
+// === Explosions ===
+bool Obstacle::handleExplosionAt(int x, int y)
+{
     for (auto it = parts.begin(); it != parts.end(); ++it) {
-        if (it->getX() == x && it->getY() == y) { parts.erase(it); break; }
+        if (it->getX() == x && it->getY() == y) {
+            parts.erase(it);
+            break;
+        }
     }
     return parts.empty();
 }
 
-void Obstacle::getDirectionDelta(Direction dir, int& dx, int& dy) {
-    dx = 0; dy = 0;
+// === Movement Helpers ===
+void Obstacle::getDirectionDelta(Direction dir, int& dx, int& dy)
+{
+    dx = 0;
+    dy = 0;
     switch (dir) {
-    case Direction::UP:    dy = -1; break;
-    case Direction::DOWN:  dy = 1;  break;
-    case Direction::LEFT:  dx = -1; break;
-    case Direction::RIGHT: dx = 1;  break;
-    default: break;
+    case Direction::UP:
+        dy = -1;
+        break;
+    case Direction::DOWN:
+        dy = 1;
+        break;
+    case Direction::LEFT:
+        dx = -1;
+        break;
+    case Direction::RIGHT:
+        dx = 1;
+        break;
+    default:
+        break;
     }
 }
 
-// === התיקון הקריטי נמצא כאן ===
 int Obstacle::getAssistForce(const Player& helper, const Player& primaryPusher, int pushDx, int pushDy) const
 {
-    // 1. כיוון: חייבים לדחוף לאותו כיוון
-    int helperDx = 0, helperDy = 0;
+    // The helper must push in the same direction as the primary pusher.
+    int helperDx = 0;
+    int helperDy = 0;
     getDirectionDelta(helper.getDirection(), helperDx, helperDy);
 
-    if (helperDx != pushDx || helperDy != pushDy) return 0;
+    if (helperDx != pushDx || helperDy != pushDy) {
+        return 0;
+    }
 
-    // מיקום היעד של העוזר (לאן הוא רוצה להגיע)
+    // The helper's target location (where they want to move next).
     int helperTargetX = helper.getX() + helperDx;
     int helperTargetY = helper.getY() + helperDy;
 
-    // בדיקה 1: Side-by-Side (העוזר נוגע ישירות במכשול)
+    // Case 1: Side-by-side push (helper directly touches the obstacle).
     if (isAtPosition(helperTargetX, helperTargetY)) {
         return helper.getForce();
     }
 
-    // בדיקה 2: Train Push (P2 -> P1 -> Obstacle)
-    // בגלל ש-P1 כבר זז לוגית (נמצא בתוך המכשול), אנחנו צריכים לבדוק שתי אפשרויות:
+    // Case 2: Train push (P2 -> P1 -> Obstacle).
+    // We need to consider both the current and previous position of P1.
 
-    // אופציה א': העוזר דוחף למקום שבו P1 נמצא כרגע (במקרה ש-P1 עוד לא זז בזיכרון)
+    // Option A: Helper pushes into the primary pusher's current position.
     if (helperTargetX == primaryPusher.getX() && helperTargetY == primaryPusher.getY()) {
         return helper.getForce();
     }
 
-    // אופציה ב' (התיקון): העוזר דוחף למקום ש-P1 *היה* בו לפני רגע.
-    // מכיוון ש-P1 זז בכיוון הדחיפה, המיקום הקודם שלו הוא (X - dx, Y - dy)
+    // Option B: Helper pushes into the primary pusher's previous position.
+    // Because P1 already moved in the push direction, their previous position
+    // is (X - dx, Y - dy).
     int p1PreviousX = primaryPusher.getX() - pushDx;
     int p1PreviousY = primaryPusher.getY() - pushDy;
 
@@ -91,14 +129,22 @@ bool Obstacle::isPathClear(int dx, int dy, const Screen& screen, const std::vect
         }
 
         for (const auto& obj : gameObjects) {
-            if (obj == this) continue;
+            if (obj == this) {
+                continue;
+            }
 
-            if (obj->getScreenId() != this->getScreenId()) continue;
+            if (obj->getScreenId() != this->getScreenId()) {
+                continue;
+            }
 
-            if (!obj->isAtPosition(nextX, nextY)) continue;
+            if (!obj->isAtPosition(nextX, nextY)) {
+                continue;
+            }
 
             if (auto laser = dynamic_cast<Laser*>(obj)) {
-                if (laser->isActive()) return false;
+                if (laser->isActive()) {
+                    return false;
+                }
                 continue;
             }
             return false;
@@ -107,18 +153,25 @@ bool Obstacle::isPathClear(int dx, int dy, const Screen& screen, const std::vect
     return true;
 }
 
-void Obstacle::applyMovement(int dx, int dy) {
-    for (auto& part : parts) part.move(dx, dy);
+void Obstacle::applyMovement(int dx, int dy)
+{
+    for (auto& part : parts) {
+        part.move(dx, dy);
+    }
     point.move(dx, dy);
 }
 
+// === Collision Handling ===
 bool Obstacle::handleCollision(Player& p, const Screen& screen, const Player* otherPlayer, const std::vector<GameObject*>& gameObjects)
 {
     Direction dir = p.isFlying() ? p.getLaunchDirection() : p.getDirection();
-    int dx = 0, dy = 0;
+    int dx = 0;
+    int dy = 0;
     getDirectionDelta(dir, dx, dy);
 
-    if (dx == 0 && dy == 0) return false;
+    if (dx == 0 && dy == 0) {
+        return false;
+    }
 
     int totalForce = p.getForce();
     if (otherPlayer) {
@@ -127,19 +180,27 @@ bool Obstacle::handleCollision(Player& p, const Screen& screen, const Player* ot
 
     int obstacleMass = static_cast<int>(parts.size());
 
-    // דיבאג קטן שאפשר להשאיר או למחוק
-    // אם המשקל גדול מהכוח - נכשל
-    if (totalForce < obstacleMass) return false;
+    // If the obstacle is heavier than the combined force, the push fails.
+    if (totalForce < obstacleMass) {
+        return false;
+    }
 
-    if (!isPathClear(dx, dy, screen, gameObjects)) return false;
+    if (!isPathClear(dx, dy, screen, gameObjects)) {
+        return false;
+    }
 
     applyMovement(dx, dy);
     return true;
 }
 
-bool Obstacle::handleCollision(Player& p, const Screen& screen) { return false; }
+bool Obstacle::handleCollision(Player& p, const Screen& screen)
+{
+    return false;
+}
 
-void Obstacle::printDebugInfo() const {
+// === Debugging ===
+void Obstacle::printDebugInfo() const
+{
     std::cout << "[Obstacle @" << this << "] Parts: ";
     for (const auto& p : parts) {
         std::cout << "(" << p.getX() << "," << p.getY() << ") ";
@@ -147,8 +208,11 @@ void Obstacle::printDebugInfo() const {
     std::cout << std::endl;
 }
 
+// === Serialization ===
 std::string Obstacle::getTypeName() const { return "OBSTACLE"; }
-std::string Obstacle::getSaveData() const {
+
+std::string Obstacle::getSaveData() const
+{
     // Format: X Y Count Part1X Part1Y Part2X Part2Y ...
     std::string s = GameObject::getSaveData() + " " + std::to_string(parts.size());
     for (const auto& p : parts) {

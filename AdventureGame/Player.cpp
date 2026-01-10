@@ -10,6 +10,7 @@
 #include "Obstacle.h"
 #include <vector>
 
+// === Construction & Reset ===
 Player::~Player()
 {
     heldItem = nullptr;
@@ -35,6 +36,40 @@ void Player::resetForNewGame(int x, int y, char c, int hudPos, ScreenId startLev
     heldItem = nullptr;
 }
 
+void Player::initForLevel(int x, int y, char c, ScreenId levelID)
+{
+    point.setPos(x, y);
+    point.setChar(c);
+    dir = Direction::STAY;
+    speed = 1;
+    force = 1;
+    flying = false;
+    loaded = false;
+    springTicksLeft = 0;
+    lastLoadedSpringLength = 0;
+    launchDirection = Direction::STAY;
+    currentLevel = levelID;
+}
+
+void Player::resetStats()
+{
+    score = 0;
+    live = 3;
+    heldItem = nullptr;
+    savedLife = 3;
+    savedScore = 0;
+}
+
+void Player::restoreState()
+{
+    live = savedLife;
+    score = savedScore;
+    heldItem = nullptr;
+    flying = false;
+    loaded = false;
+}
+
+// === Movement & Physics ===
 void Player::stopMovement()
 {
     dir = Direction::STAY;
@@ -42,46 +77,80 @@ void Player::stopMovement()
 
 void Player::calculateMovementDelta(int& dx, int& dy) const
 {
-    dx = 0; dy = 0;
+    dx = 0;
+    dy = 0;
 
     if (isFlying())
     {
-        // 1. כיוון הבסיס של הקפיץ
+        // Base spring launch direction.
         switch (launchDirection)
         {
-        case Direction::UP:    dy = -1; break;
-        case Direction::DOWN:  dy = 1;  break;
-        case Direction::LEFT:  dx = -1; break;
-        case Direction::RIGHT: dx = 1;  break;
-        default: break;
+        case Direction::UP:
+            dy = -1;
+            break;
+        case Direction::DOWN:
+            dy = 1;
+            break;
+        case Direction::LEFT:
+            dx = -1;
+            break;
+        case Direction::RIGHT:
+            dx = 1;
+            break;
+        default:
+            break;
         }
 
-        // 2. היגוי אוויר (Steering) - תיקון באג 1
-        // הוספנו תמיכה גם ב-LEFT ו-RIGHT
+        // Air steering: allow additional directional influence while flying.
         switch (dir)
         {
-        case Direction::UP:    dy -= 1; break;
-        case Direction::DOWN:  dy += 1; break;
-        case Direction::LEFT:  dx -= 1; break; 
-        case Direction::RIGHT: dx += 1; break; 
-        default: break;
+        case Direction::UP:
+            dy -= 1;
+            break;
+        case Direction::DOWN:
+            dy += 1;
+            break;
+        case Direction::LEFT:
+            dx -= 1;
+            break;
+        case Direction::RIGHT:
+            dx += 1;
+            break;
+        default:
+            break;
         }
 
-        
-        if (dx > 1) dx = 1;
-        if (dx < -1) dx = -1;
-        if (dy > 1) dy = 1;
-        if (dy < -1) dy = -1;
+        if (dx > 1) {
+            dx = 1;
+        }
+        if (dx < -1) {
+            dx = -1;
+        }
+        if (dy > 1) {
+            dy = 1;
+        }
+        if (dy < -1) {
+            dy = -1;
+        }
     }
     else
     {
         switch (dir)
         {
-        case Direction::UP:    dy = -1; break;
-        case Direction::DOWN:  dy = 1;  break;
-        case Direction::LEFT:  dx = -1; break;
-        case Direction::RIGHT: dx = 1;  break;
-        default: break;
+        case Direction::UP:
+            dy = -1;
+            break;
+        case Direction::DOWN:
+            dy = 1;
+            break;
+        case Direction::LEFT:
+            dx = -1;
+            break;
+        case Direction::RIGHT:
+            dx = 1;
+            break;
+        default:
+            break;
         }
     }
 }
@@ -102,36 +171,6 @@ bool Player::isBlockedByStatic(int x, int y, const Screen& screen, Player* other
     return false;
 }
 
-bool Player::handleObjectInteractions(const Screen& screen, std::vector<GameObject*>& gameObjects, Player* otherPlayer)
-{
-    ScreenId currentScreenId = screen.getScreenId();
-    int px = point.getX();
-    int py = point.getY();
-
-    for (auto obj : gameObjects)
-    {
-        if (!obj || obj->getScreenId() != currentScreenId || obj->isCollected())
-            continue;
-
-        if (obj->isAtPosition(px, py))
-        {
-            bool allowed = true;
-
-            if (auto obstacle = dynamic_cast<Obstacle*>(obj))
-            {
-                allowed = obstacle->handleCollision(*this, screen, otherPlayer, gameObjects);
-            }
-            else
-            {
-                allowed = obj->handleCollision(*this, screen);
-            }
-
-            if (!allowed) return false;
-        }
-    }
-    return true;
-}
-
 void Player::handleStop()
 {
     if (isFlying()) {
@@ -142,11 +181,15 @@ void Player::handleStop()
     }
 }
 
+// === Movement Execution ===
 void Player::move(Screen& screen, std::vector<GameObject*>& gameObjects, Player* otherPlayer)
 {
-    if (point.getX() == -1 || isLoaded()) return;
+    if (point.getX() == -1 || isLoaded()) {
+        return;
+    }
 
-    int dx = 0, dy = 0;
+    int dx = 0;
+    int dy = 0;
     calculateMovementDelta(dx, dy);
 
     if (dx == 0 && dy == 0)
@@ -154,7 +197,9 @@ void Player::move(Screen& screen, std::vector<GameObject*>& gameObjects, Player*
         bool onSpring = false;
         for (auto obj : gameObjects)
         {
-            if (obj->getScreenId() != currentLevel || obj->isCollected()) continue;
+            if (obj->getScreenId() != currentLevel || obj->isCollected()) {
+                continue;
+            }
 
             if (obj->isAtPosition(point.getX(), point.getY()))
             {
@@ -165,7 +210,9 @@ void Player::move(Screen& screen, std::vector<GameObject*>& gameObjects, Player*
             }
         }
 
-        if (!onSpring) return;
+        if (!onSpring) {
+            return;
+        }
     }
 
     Point nextPos(point.getX() + dx, point.getY() + dy, ' ');
@@ -205,6 +252,40 @@ void Player::move(Screen& screen, std::vector<GameObject*>& gameObjects, Player*
     }
 }
 
+bool Player::handleObjectInteractions(const Screen& screen, std::vector<GameObject*>& gameObjects, Player* otherPlayer)
+{
+    ScreenId currentScreenId = screen.getScreenId();
+    int px = point.getX();
+    int py = point.getY();
+
+    for (auto obj : gameObjects)
+    {
+        if (!obj || obj->getScreenId() != currentScreenId || obj->isCollected()) {
+            continue;
+        }
+
+        if (obj->isAtPosition(px, py))
+        {
+            bool allowed = true;
+
+            if (auto obstacle = dynamic_cast<Obstacle*>(obj))
+            {
+                allowed = obstacle->handleCollision(*this, screen, otherPlayer, gameObjects);
+            }
+            else
+            {
+                allowed = obj->handleCollision(*this, screen);
+            }
+
+            if (!allowed) {
+                return false;
+            }
+        }
+    }
+    return true;
+}
+
+// === Spring Mechanics ===
 void Player::launch(int springLength)
 {
     startSpringEffect(springLength);
@@ -218,18 +299,22 @@ void Player::startSpringEffect(int springLength)
     speed = springLength;
     force = springLength;
     dir = launchDirection;
-    Game::playSound(400 + (springLength *50), 150);
+    Game::playSound(400 + (springLength * 50), 150);
 }
 
 void Player::updateSpringEffect()
 {
-    if (!flying) return;
+    if (!flying) {
+        return;
+    }
 
-    if (springTicksLeft > 0)
+    if (springTicksLeft > 0) {
         springTicksLeft--;
+    }
 
-    if (springTicksLeft <= 0)
+    if (springTicksLeft <= 0) {
         stopSpringEffect();
+    }
 }
 
 void Player::stopSpringEffect()
@@ -242,6 +327,7 @@ void Player::stopSpringEffect()
     dir = Direction::STAY;
 }
 
+// === Inventory ===
 bool Player::collectItem(GameObject* item)
 {
     if (!hasItem())
@@ -258,7 +344,9 @@ bool Player::collectItem(GameObject* item)
 
 GameObject* Player::dropItemToScreen(ScreenId currentScreenID)
 {
-    if (!hasItem()) return nullptr;
+    if (!hasItem()) {
+        return nullptr;
+    }
 
     GameObject* itemToDrop = heldItem;
     itemToDrop->setPosition(point.getX(), point.getY());
@@ -291,8 +379,9 @@ int Player::getHeldKeyID() const
 {
     if (heldItem)
     {
-        if (auto k = dynamic_cast<Key*>(heldItem))
+        if (auto k = dynamic_cast<Key*>(heldItem)) {
             return k->getKeyID();
+        }
     }
     return -1;
 }
@@ -309,8 +398,9 @@ bool Player::hasRiddle() const
 
 Riddle* Player::getHeldRiddle() const
 {
-    if (hasRiddle())
+    if (hasRiddle()) {
         return dynamic_cast<Riddle*>(heldItem);
+    }
     return nullptr;
 }
 
@@ -319,37 +409,7 @@ char Player::getItemChar() const
     return heldItem ? heldItem->getChar() : ' ';
 }
 
-void Player::initForLevel(int x, int y, char c, ScreenId levelID)
-{
-    point.setPos(x, y);
-    point.setChar(c);
-    dir = Direction::STAY;
-    speed = 1;
-    force = 1;
-    flying = false;
-    loaded = false;
-    springTicksLeft = 0;
-    lastLoadedSpringLength = 0;
-    launchDirection = Direction::STAY;
-    currentLevel = levelID;
-}
-
-void Player::resetStats() {
-    score = 0;
-    live = 3;
-    heldItem = nullptr;
-    savedLife = 3;
-    savedScore = 0;
-}
-
-void Player::restoreState() {
-    live = savedLife;
-    score = savedScore;
-    heldItem = nullptr;
-    flying = false;
-    loaded = false;
-}
-
+// === Serialization ===
 std::string Player::getSaveData(int id) const
 {
     // Format: PLAYER <id> <x> <y> <lives> <score> <HeldItemX> <HeldItemY>

@@ -7,10 +7,10 @@
 //                    STATIC MEMBERS
 // =============================================================
 std::string Game::statusMessage = "";
-bool Game::soundEnabled = true; // Define static variable
+bool Game::soundEnabled = true;
 
 // =============================================================
-//                    BASE CLASS: Game Implementation
+//               CONSTRUCTOR & DESTRUCTOR
 // =============================================================
 
 Game::Game()
@@ -29,18 +29,138 @@ Game::~Game() {
     gameObjects.clear();
 }
 
-// === NEW: Non-Blocking Sound System ===
-bool Game::isSoundEnabled() { return soundEnabled; }
+// =============================================================
+//                    MAIN GAME LOOP
+// =============================================================
 
-void Game::playSound(int frequency, int duration)
+void Game::start()
 {
-    if (!soundEnabled) return;
+    hideCursor();
 
-    // Run Beep in a separate thread so it doesn't freeze the game loop
-    std::thread([frequency, duration]() {
-        Beep(frequency, duration);
-        }).detach();
+    // 1. Specific Initialization (Virtual) - Menu or File loading
+    initSession();
+
+    while (isRunning)
+    {
+        // 2. Input (Virtual) - Keyboard or File
+        handleInput();
+
+        // 3. Logic Update
+        update();
+
+        // 4. Graphics (Virtual) - Skipped in Silent Mode
+        outputGraphics();
+
+        // 5. Time Management (Virtual) - Skipped in Silent Mode
+        handleSleep();
+    }
+    cls();
 }
+
+void Game::update()
+{
+    cycleCounter++; // Time always advances here
+
+    processPlayerMovement(player1, &player2);
+    processPlayerMovement(player2, &player1);
+
+    if (player1.isFlying()) player1.updateSpringEffect();
+    if (player2.isFlying()) player2.updateSpringEffect();
+
+    updateBombs();
+
+    if (currentScreen->getScreenId() != ScreenId::HOME &&
+        currentScreen->getScreenId() != ScreenId::INSTRUCTIONS)
+    {
+        checkLevelTransition();
+    }
+
+    handleInteractions();
+    cleanupDeadObjects();
+    checkGameStatus();
+    handleFlowControl();
+}
+
+void Game::handleInput()
+{
+    // === Polymorphic Input Handling ===
+    // We request the next character. It doesn't matter if it comes from Keyboard or File.
+    char key = getNextChar();
+
+    if (key == 0) return;
+
+    // --- Core Game Logic ---
+
+    if (RiddleMode && currentRiddle) {
+        handleRiddleInput(key);
+        return;
+    }
+
+    // Main Menu Handling
+    if (currentScreen == &screens[(int)ScreenId::HOME]) {
+        if (key == '1') {
+            playSound(600, 100);
+            resetGame();
+            return;
+        }
+        if (key == '2') { goToScreen(ScreenId::INSTRUCTIONS); return; }
+        if (key == '3') {
+            if (!allowSaveLoad()) {
+                setStatusMessage("Load disabled during recording/playback!");
+            }
+            else {
+                try {
+                    resetGame();
+                    loadGameState("savegame.sav");
+                    setStatusMessage("Game Loaded Successfully!");
+                    playSound(1000, 200);
+                }
+                catch (const std::exception&) {
+                    setStatusMessage("Load Failed! Started New Game instead.");
+                }
+                return;
+            }
+        }
+        if (key == 'q' || key == 'Q') {
+            end();
+            reportEvent("GAME_ENDED", "Score: " + std::to_string(player1.getScore() + player2.getScore()));
+            return;
+        }
+        if (key == 'c' || key == 'C') {
+            toggleColor();
+            setStatusMessage(isColorEnabled() ? "Color: ON" : "Color: OFF");
+            outputGraphics();
+            return;
+        }
+        if (key == 's' || key == 'S') {
+            toggleSound();
+            setStatusMessage(isSoundEnabled() ? "Sound: ON" : "Sound: OFF");
+            if (isSoundEnabled()) playSound(400, 100);
+            return;
+        }
+    }
+
+    // Exit from Special Screens (Instructions / End Game)
+    if (currentScreen->getScreenId() == ScreenId::ROOM4 || currentScreen->getScreenId() == ScreenId::INSTRUCTIONS) {
+        if (key == '1' && currentScreen->getScreenId() == ScreenId::ROOM4) { resetGame(); }
+        else if (key == 'h' || key == 'H') {
+            reportEvent("GAME_ENDED", "User Quit to Menu");
+            endSession();
+            goToScreen(ScreenId::HOME);
+            setStatusMessage("");
+        }
+    }
+
+    if (key == 27) { pauseScreen(); return; }
+
+    ChangeDirection(key);
+    if (key == 'E' || key == 'e') player1.dropItemToScreen(currentScreen->getScreenId());
+    else if (key == 'O' || key == 'o') player2.dropItemToScreen(currentScreen->getScreenId());
+}
+
+// =============================================================
+//               INITIALIZATION & RESET
+// =============================================================
 
 void Game::initGame()
 {
@@ -81,53 +201,58 @@ void Game::resetGame()
     goToScreen(ScreenId::ROOM1);
 }
 
-// === MAIN LOOP ===
-void Game::start()
+// =============================================================
+//               LEVEL & SCREEN MANAGEMENT
+// =============================================================
+
+void Game::goToScreen(ScreenId id)
 {
-    hideCursor();
+    currentScreen = &screens[(int)id];
+    int legendBaseX = 0;
+    int legendBaseY = 0;
 
-    // 1. אתחול ספציפי (וירטואלי) - תפריט או טעינת קובץ
-    initSession();
-
-    while (isRunning)
-    {
-        // 2. קלט (וירטואלי) - מהמקלדת או מהקובץ
-        handleInput();
-
-        // 3. לוגיקה
-        update();
-
-        // 4. גרפיקה (וירטואלי) - FileGame ב-Silent ידלג
-        outputGraphics();
-
-        // 5. זמן (וירטואלי) - FileGame ב-Silent לא יישן
-        handleSleep();
+    if (currentScreen->hasLegendDefined()) {
+        Point lPos = currentScreen->getLegendStart();
+        legendBaseX = lPos.getX();
+        legendBaseY = lPos.getY();
+        const int LEGEND_WIDTH = 75;
+        for (int y = legendBaseY; y <= legendBaseY + 2; ++y) {
+            for (int x = legendBaseX; x < legendBaseX + LEGEND_WIDTH; ++x) {
+                if (y >= 0 && y < Screen::HEIGHT && x >= 0 && x < Screen::WIDTH) {
+                    currentScreen->setChar(x, y, '#');
+                }
+            }
+        }
     }
-    cls();
-}
 
-void Game::handleSleep() {
-    Sleep(TICK_MS);
-}
+    int textRowY = legendBaseY + 1;
+    player1.setHudPosition(legendBaseX + 1, textRowY);
+    player2.setHudPosition(legendBaseX + 17, textRowY);
 
-void Game::outputGraphics() {
-    draw();
+    Point start1 = currentScreen->getStartPos1();
+    Point start2 = currentScreen->getStartPos2();
+    player1.initForLevel(start1.getX(), start1.getY(), '$', id);
+    player2.initForLevel(start2.getX(), start2.getY(), '&', id);
+
+    setStatusMessage("");
+    if (currentScreen->isDark()) setStatusMessage("Dark Room,Try Torch!");
+    assignRiddlesToLevel();
 }
 
 void Game::restartCurrentLevel()
 {
     ScreenId currentId = currentScreen->getScreenId();
 
-    // --- התיקון: מחיקה סלקטיבית ---
-    // אנחנו מוחקים רק אובייקטים ששייכים לחדר שאותו אנחנו מאתחלים
+    // --- Fix: Selective Deletion ---
+    // We only delete objects belonging to the room being reset
     auto it = gameObjects.begin();
     while (it != gameObjects.end()) {
         if ((*it)->getScreenId() == currentId) {
-            delete* it;                 // שחרור זיכרון
-            it = gameObjects.erase(it); // הוצאה מהרשימה
+            delete* it;                 // Free memory
+            it = gameObjects.erase(it); // Remove from list
         }
         else {
-            ++it; // אובייקטים מחדרים אחרים נשארים בטוחים
+            ++it; // Objects from other rooms remain safe
         }
     }
     // -----------------------------
@@ -144,10 +269,10 @@ void Game::restartCurrentLevel()
     default: filename = "adv-world_01.screen"; break;
     }
 
-    // יצירת המסך מחדש
+    // Recreate the screen
     screens[(int)currentId] = Screen(currentId);
 
-    // טעינת האובייקטים (זה יוסיף אותם לסוף הרשימה, אחרי האובייקטים של החדרים האחרים)
+    // Load objects (appends to end of list, after other rooms' objects)
     LevelLoader::loadLevelFromFile(filename, screens[(int)currentId], gameObjects);
 
     RiddleMode = false;
@@ -158,15 +283,410 @@ void Game::restartCurrentLevel()
     assignRiddlesToLevel();
 }
 
+void Game::checkLevelTransition()
+{
+    ScreenId t1 = player1.getCurrentLevel();
+    ScreenId t2 = player2.getCurrentLevel();
+    ScreenId real = currentScreen->getScreenId();
+
+    if (t1 != real && t2 == real && player1.getX() != -1) {
+        setStatusMessage("p1 change Room!");
+        reportEvent("SCREEN_CHANGE", "P1 to " + std::to_string((int)t1));
+        player1.updatepoint(-1, -1);
+    }
+    if (t2 != real && t1 == real && player2.getX() != -1) {
+        setStatusMessage("p2 change Room!");
+        reportEvent("SCREEN_CHANGE", "P2 to " + std::to_string((int)t2));
+        player2.updatepoint(-1, -1);
+    }
+
+    if (t1 != real && t2 != real && t1 == t2) {
+
+        if (t1 == FINAL_LEVEL) {
+            reportEvent("GAME_WON", "Finished Last Level");
+        }
+        playSound(523, 100); // Level Complete Chime (C)
+        playSound(659, 100); // (E)
+        playSound(784, 200); // (G)
+
+        setStatusMessage("Level Complete! +200");
+        player1.addScore(100);
+        player2.addScore(100);
+        player1.saveState();
+        player2.saveState();
+        goToScreen(t1);
+    }
+}
+
+// =============================================================
+//               GAME MECHANICS
+// =============================================================
+
+void Game::processPlayerMovement(Player& p, Player* other)
+{
+    // Calculate steps per tick (depends on speed/flying)
+    int steps = p.isFlying() ? p.getSpeed() : 1;
+
+    for (int i = 0; i < steps; ++i) {
+        p.move(*currentScreen, gameObjects, other);
+
+        // If player landed or stopped mid-flight, break the loop
+        if (!p.isFlying() && steps > 1) break;
+    }
+}
+
+void Game::updateBombs()
+{
+    ScreenId curr_screen = currentScreen->getScreenId();
+    for (auto obj : gameObjects) {
+        if (pendingRestart || exitToMainMenu) return;
+        auto bomb = dynamic_cast<Bomb*>(obj);
+        if (!bomb || bomb->getScreenId() != curr_screen) continue;
+
+        if (bomb->tick()) {
+            std::string location = std::to_string(bomb->getX()) + "," + std::to_string(bomb->getY());
+            reportEvent("BOMB_EXPLODE", location);
+            playSound(150, 150); // Now async!
+            Point c = bomb->getPoint();
+            int radius = Bomb::getExplosionRadius();
+            visualizeExplosion(c.getX(), c.getY(), radius);
+            applyBombEffects(c.getX(), c.getY(), *currentScreen, radius);
+            if (pendingRestart || exitToMainMenu) return;
+            bomb->removeFromGame();
+            setStatusMessage("BOOM!");
+        }
+    }
+}
+
+void Game::applyBombEffects(int cx, int cy, Screen& curr_screen, int R)
+{
+    for (int y = cy - R; y <= cy + R; ++y) {
+        for (int x = cx - R; x <= cx + R; ++x) {
+            if (!curr_screen.inBounds(x, y)) continue;
+            explodeCell(x, y, curr_screen);
+        }
+    }
+}
+
+void Game::explodeCell(int x, int y, Screen& screen)
+{
+    if (player1.getX() == x && player1.getY() == y) { reportEvent("LIFE_LOST", "P1"); player1.decreaseLife(); }
+    if (player2.getX() == x && player2.getY() == y) { reportEvent("LIFE_LOST", "P2"); player2.decreaseLife(); }
+
+    bool isBorder = (x == 0 || x == Screen::WIDTH - 1 || y == 0 || y == Screen::HEIGHT - 1);
+    bool isLegendArea = false;
+    if (screen.hasLegendDefined()) {
+        Point lPos = screen.getLegendStart();
+        if (x >= lPos.getX() && x < lPos.getX() + Screen::LEGEND_WIDTH &&
+            y >= lPos.getY() && y <= lPos.getY() + 2) {
+            isLegendArea = true;
+        }
+    }
+
+    if (!isBorder && !isLegendArea) {
+        if (screen.getLine(y)[x] == '#') screen.setChar(x, y, ' ');
+    }
+
+    for (auto obj : gameObjects) {
+        if (!obj || obj->getScreenId() != screen.getScreenId()) continue;
+        if (obj->getX() < 0 || obj->getY() < 0) continue;
+        if (obj->isCollected()) continue;
+
+        if (obj->isAtPosition(x, y)) {
+            if (auto key = dynamic_cast<Key*>(obj)) {
+                gameOverScreen("Mission Failed: Key Destroyed!");
+                return;
+            }
+            if (auto door = dynamic_cast<Door*>(obj)) {
+                gameOverScreen("Mission Failed: Door Destroyed!");
+                return;
+            }
+            if (dynamic_cast<Bomb*>(obj)) continue;
+            if (obj->handleExplosionAt(x, y)) {
+                obj->removeFromGame();
+            }
+        }
+    }
+}
+
+void Game::handleInteractions()
+{
+    if (RiddleMode) return;
+
+    // Check if P1 stepped on a riddle
+    if (player1.getInteractingRiddle() != nullptr) {
+        startRiddle(player1.getInteractingRiddle(), player1);
+        player1.clearInteractingRiddle();
+    }
+    // Check if P2 stepped on a riddle
+    else if (player2.getInteractingRiddle() != nullptr) {
+        startRiddle(player2.getInteractingRiddle(), player2);
+        player2.clearInteractingRiddle();
+    }
+}
+
+void Game::checkGameStatus()
+{
+    if (pendingRestart || exitToMainMenu) return;
+
+    if (player1.getLive() <= 0) {
+        gameOverScreen("Player 1 ran out of lives!");
+    }
+    else if (player2.getLive() <= 0) {
+        gameOverScreen("Player 2 ran out of lives!");
+    }
+}
+
+void Game::handleFlowControl()
+{
+    // Restart Level
+    if (pendingRestart) {
+        pendingRestart = false;
+        restartCurrentLevel();
+        return;
+    }
+
+    // Exit to Main Menu
+    if (exitToMainMenu) {
+        exitToMainMenu = false;
+        player1.stopMovement();
+        player2.stopMovement();
+        resetGame();
+        goToScreen(ScreenId::HOME);
+        return;
+    }
+}
+
+void Game::cleanupDeadObjects()
+{
+    auto it = gameObjects.begin();
+    while (it != gameObjects.end()) {
+        // Objects with position (-1, -1) are marked for deletion
+        if ((*it)->getX() == -1) {
+            // Safety: Ensure players aren't holding a pointer to the object we are about to delete
+            if (player1.isHoldingItem(*it)) player1.forceDropItem();
+            if (player2.isHoldingItem(*it)) player2.forceDropItem();
+
+            delete* it;
+            it = gameObjects.erase(it);
+        }
+        else {
+            ++it;
+        }
+    }
+}
+
+// =============================================================
+//               RIDDLE SYSTEM
+// =============================================================
+
+void Game::handleRiddleInput(char key)
+{
+    if (!currentRiddle || !currentRiddlePlayer) return;
+
+    if (key < '1' || key > '4') { setStatusMessage("Press 1-4"); return; }
+
+    int selected = key - '0';
+    Player& p = *currentRiddlePlayer;
+    std::string pName = (&p == &player1) ? "P1" : "P2";
+
+    if (selected == currentRiddle->getCorrectAnswer()) {
+        reportEvent("RIDDLE", pName + " Correct");
+        playSound(1000, 100); // Correct Sound
+        setStatusMessage("Correct! +100 Points");
+
+        currentRiddlePlayer->addScore(100);
+        currentRiddle->removeFromGame();
+
+        RiddleMode = false;
+        currentRiddle = nullptr;
+        currentRiddlePlayer = nullptr;
+    }
+    else {
+        reportEvent("RIDDLE", pName + " Wrong");
+        playSound(200, 300); // Error Sound
+        p.decreaseLife();
+        reportEvent("LIFE_LOST", pName);
+        setStatusMessage("Wrong! You lost a life.");
+        outputGraphics();
+        if (p.getLive() <= 0) {
+            RiddleMode = false;
+            currentRiddle = nullptr;
+            currentRiddlePlayer = nullptr;
+        }
+    }
+}
+
+void Game::startRiddle(Riddle* riddle, Player& p)
+{
+    if (!riddle) return;
+    std::string pName = (&p == &player1) ? "P1" : "P2";
+    int riddleId = riddle->getData().id;
+    reportEvent("RIDDLE_START", pName + " ID:" + std::to_string(riddleId));
+    currentRiddle = riddle;
+    currentRiddlePlayer = &p;
+    RiddleMode = true;
+    stopMovement();
+    setStatusMessage("Riddle time! Press 1-4 ");
+}
+
+void Game::loadRiddlesFromFile(const std::string& filename)
+{
+    std::ifstream file(filename);
+    if (!file) { throw GameException("Missing Riddles File: " + filename, "Game::loadRiddlesFromFile"); return; }
+    riddlesPool.clear();
+    std::string line;
+    RiddleData current;
+    bool readingText = false;
+    bool shouldShuffle = true;
+
+    while (std::getline(file, line)) {
+        if (!line.empty() && line.back() == '\r') line.pop_back();
+        if (line.find("SHUFFLE:") != std::string::npos) {
+            if (line.find("FALSE") != std::string::npos) shouldShuffle = false;
+            continue;
+        }
+        if (line == "[RIDDLE]") {
+            current = RiddleData();
+            readingText = false;
+        }
+        else if (line.find("ID:") == 0) current.id = std::stoi(line.substr(3));
+        else if (line.find("ANSWER:") == 0) current.correctAnswer = std::stoi(line.substr(7));
+        else if (line == "TEXT") readingText = true;
+        else if (line == "END_TEXT") {
+            readingText = false;
+            riddlesPool.push_back(current);
+        }
+        else if (readingText) current.textLines.push_back(line);
+    }
+    file.close();
+
+    if (shouldShuffle) {
+        std::shuffle(riddlesPool.begin(), riddlesPool.end(), std::default_random_engine(randomSeed));
+    }
+    else {
+        std::sort(riddlesPool.begin(), riddlesPool.end(),
+            [](const RiddleData& a, const RiddleData& b) { return a.id < b.id; });
+        std::reverse(riddlesPool.begin(), riddlesPool.end());
+    }
+}
+
+void Game::assignRiddlesToLevel()
+{
+    for (GameObject* obj : gameObjects) {
+        Riddle* riddle = dynamic_cast<Riddle*>(obj);
+        if (riddle && riddle->getScreenId() == currentScreen->getScreenId()) {
+            if (riddlesPool.empty()) loadRiddlesFromFile("Riddles.txt");
+            if (!riddlesPool.empty()) {
+                RiddleData data = riddlesPool.back();
+                riddlesPool.pop_back();
+                riddle->setData(data);
+            }
+        }
+    }
+}
+
+bool Game::checkPlayerHasRiddle()
+{
+    return player1.hasRiddle() || player2.hasRiddle();
+}
+
+const RiddleData* Game::getRiddleDataById(int id) const {
+    for (const auto& rData : riddlesPool) {
+        if (rData.id == id) {
+            return &rData;
+        }
+    }
+    return nullptr;
+}
+
+// =============================================================
+//               GRAPHICS, UI & RENDERING
+// =============================================================
+
+void Game::handleSleep() {
+    Sleep(TICK_MS);
+}
+
+void Game::outputGraphics() {
+    draw();
+}
+
+void Game::visualizeExplosion(int cx, int cy, int radius)
+{
+    if (isSilentMode()) return;
+    for (int y = cy - radius; y <= cy + radius; ++y) {
+        for (int x = cx - radius; x <= cx + radius; ++x) {
+            if (x >= 0 && x < Screen::WIDTH && y >= 0 && y < Screen::HEIGHT) {
+                gotoxy(x, y);
+                if (colorEnabled) setConsoleColor(14);
+                std::cout << "+";
+                if (colorEnabled) setConsoleColor(7);
+            }
+        }
+    }
+    gotoxy(0, 0);
+    // Use virtual sleep twice
+    handleSleep();
+    handleSleep();
+}
+
+void Game::pauseScreen()
+{
+    int x = (Screen::WIDTH - 37) / 2;
+    int y = (Screen::HEIGHT - 6) / 2;
+    if (!isSilentMode()) {
+        gotoxy(x, y);     std::cout << "*************************************";
+        gotoxy(x, y + 1); std::cout << "* GAME PAUSED                       *";
+        gotoxy(x, y + 2); std::cout << "* *";
+        gotoxy(x, y + 3); std::cout << "* [ESC] Continue                    *";
+        gotoxy(x, y + 4); std::cout << "* [S]   Save Current State          *";
+        gotoxy(x, y + 5); std::cout << "* [H]   Exit to Main Menu           *";
+        gotoxy(x, y + 6); std::cout << "*************************************";
+    }
+    while (true) {
+        // Use virtual getNextChar
+        char key = getNextChar();
+
+        if (key == 0) continue;
+
+        if (key == 27) return; // ESC
+
+        if (key == 's' || key == 'S') {
+            if (!allowSaveLoad()) {
+                setStatusMessage("Save disabled during recording/playback!");
+                gotoxy(x + 2, y + 2); std::cout << "Save disabled during recording/playback!";
+            }
+            else {
+                try {
+                    saveGameState("savegame.sav");
+                    gotoxy(x + 2, y + 2); std::cout << "      Game Saved Successfully!     ";
+                    handleSleep();
+                    return;
+                }
+                catch (...) {
+                    setStatusMessage("Save Failed!");
+                }
+            }
+        }
+
+        if (key == 'h' || key == 'H') {
+            reportEvent("GAME_ENDED", "User Quit to Menu");
+            endSession();
+            goToScreen(ScreenId::HOME);
+            setStatusMessage("");
+            return;
+        }
+    }
+}
+
 void Game::gameOverScreen(const std::string& message)
 {
-    // דיווח לקובץ התוצאות שהמשחק נגמר
     reportEvent("GAME_OVER", message);
 
     playSound(100, 600);
     system("cls");
     if (!isSilentMode()) {
-        // --- קוד הציור (ללא שינוי) ---
         const int BOX_WIDTH = 50;
         const int BOX_HEIGHT = 9;
         int x = (Screen::WIDTH - BOX_WIDTH) / 2;
@@ -188,153 +708,42 @@ void Game::gameOverScreen(const std::string& message)
         printCentered(4, message);
         printCentered(6, "[R] Restart Level    [H] Main Menu");
     }
-    // --- הלולאה ---
+
     while (isRunning) {
-        // שימוש בפולימורפיזם: המחשב יחליט אם לקחת מקש מהמקלדת או מהקובץ
+        // Polymorphic Input
         char key = getNextChar();
 
-        // ב-FileGame, אם נגמרו הצעדים, isRunning יהפוך ל-false.
-        // אנחנו חייבים לבדוק את זה כדי לצאת מהלולאה.
+        // In FileGame, if steps are over, isRunning becomes false.
         if (!isRunning) return;
 
-        if (key == 0) continue; // לא נלחץ כלום, ממשיכים לחכות
+        if (key == 0) continue;
 
         // [R] Restart Level
         if (key == 'R' || key == 'r') {
-            // בריסטרט אנחנו ממשיכים את אותו סשן, אז לא סוגרים קבצים
             pendingRestart = true;
             return;
         }
 
         // [H] Exit to Main Menu
         else if (key == 'H' || key == 'h') {
-
             reportEvent("GAME_ENDED", "User Quit from Game Over");
-
-            // סגירת הסשן (סגירת קבצים ב-KeyBoard, הדפסת דוח ב-FileGame)
             endSession();
-
-            // סימון ליציאה לתפריט (הלולאה הראשית ב-start תטפל בזה)
             exitToMainMenu = true;
             return;
         }
     }
 }
 
-// === NEW: Garbage Collector to improve stability ===
-void Game::cleanupDeadObjects()
+void Game::draw()
 {
-    auto it = gameObjects.begin();
-    while (it != gameObjects.end()) {
-        // Objects with position (-1, -1) are marked for deletion
-        if ((*it)->getX() == -1) {
-            // Safety: Ensure players aren't holding a pointer to the object we are about to delete
-            if (player1.isHoldingItem(*it)) player1.forceDropItem();
-            if (player2.isHoldingItem(*it)) player2.forceDropItem();
-
-            delete* it;
-            it = gameObjects.erase(it);
-        }
-        else {
-            ++it;
-        }
-    }
-}
-
-// =============================================================
-//                     CORE GAME LOOP UPDATES
-// ============================================================
-
-void Game::update()
-{
-    cycleCounter++; // קידום זמן תמיד קורה כאן
-
-    processPlayerMovement(player1, &player2);
-    processPlayerMovement(player2, &player1);
-
-    if (player1.isFlying()) player1.updateSpringEffect();
-    if (player2.isFlying()) player2.updateSpringEffect();
-
-    updateBombs();
-
-    if (currentScreen->getScreenId() != ScreenId::HOME &&
-        currentScreen->getScreenId() != ScreenId::INSTRUCTIONS)
-    {
-        checkLevelTransition();
-    }
-
-    handleInteractions();
-    cleanupDeadObjects();
-    checkGameStatus();
-    handleFlowControl();
-}
-
-void Game::handleInput()
-{
-    // === הקסם הפולימורפי ===
-    // אנחנו מבקשים את התו הבא. לא מעניין אותנו מאיפה הוא בא.
-    char key = getNextChar();
-
-    if (key == 0) return;
-
-    // --- לוגיקת משחק רגילה ---
-
-    if (RiddleMode && currentRiddle) {
-        handleRiddleInput(key);
-        return;
-    }
-
-    // תפריט ראשי
-    if (currentScreen == &screens[(int)ScreenId::HOME]) {
-        if (key == '1') {
-            playSound(600, 100);
-            resetGame();
-            return;
-        }
-        if (key == '2') { goToScreen(ScreenId::INSTRUCTIONS); return; }
-        if (key == '3') {
-            if (!allowSaveLoad()) {
-                setStatusMessage("Load disabled during recording/playback!");
-            }
-            else {
-                try {
-                    resetGame();
-                    loadGameState("savegame.sav");
-                    setStatusMessage("Game Loaded Successfully!");
-                    playSound(1000, 200);
-                }
-                catch (const std::exception&) {
-                    setStatusMessage("Load Failed! Started New Game instead.");
-                }
-                return;
-            }
-        }
-        if (key == 'q' || key == 'Q') { end(); reportEvent("GAME_ENDED", "Score: " + std::to_string(player1.getScore() + player2.getScore())); return; }
-        if (key == 'c' || key == 'C') { toggleColor(); setStatusMessage(isColorEnabled() ? "Color: ON" : "Color: OFF"); outputGraphics(); return; }
-        if (key == 's' || key == 'S') { toggleSound(); setStatusMessage(isSoundEnabled() ? "Sound: ON" : "Sound: OFF"); if (isSoundEnabled()) playSound(400, 100); return; }
-    }
-
-    // יציאה ממסכים מיוחדים
-    if (currentScreen->getScreenId() == ScreenId::ROOM4 || currentScreen->getScreenId() == ScreenId::INSTRUCTIONS) {
-        if (key == '1' && currentScreen->getScreenId() == ScreenId::ROOM4) { resetGame(); }
-        else if (key == 'h' || key == 'H') {
-            reportEvent("GAME_ENDED", "User Quit to Menu");
-            endSession();
-            goToScreen(ScreenId::HOME);
-            setStatusMessage("");
-        }
-    }
-
-    if (key == 27) { pauseScreen(); return; }
-
-    ChangeDirection(key);
-    if (key == 'E' || key == 'e') player1.dropItemToScreen(currentScreen->getScreenId());
-    else if (key == 'O' || key == 'o') player2.dropItemToScreen(currentScreen->getScreenId());
-}
-
-// פונקציית מעטפת לדיווח - מעבירה את העבודה לבנים
-void Game::reportEvent(const std::string& type, const std::string& details) {
-    handleEventReport(type, details);
+    auto buffer = initBuffer();
+    drawObjectsToBuffer(buffer);
+    drawPlayersToBuffer(buffer);
+    applyLighting(buffer);
+    drawLegendToBuffer(buffer);
+    drawHomeMessage(buffer);
+    if (RiddleMode && currentRiddle) drawRiddle(buffer);
+    renderBuffer(buffer);
 }
 
 std::vector<std::string> Game::initBuffer()
@@ -463,6 +872,16 @@ void Game::drawRiddle(std::vector<std::string>& buffer)
     }
 }
 
+void Game::drawHomeMessage(std::vector<std::string>& buffer)
+{
+    if (currentScreen->getScreenId() != ScreenId::HOME) return;
+    if (statusMessage.empty()) return;
+    int msgLen = (int)statusMessage.length();
+    int x = (Screen::WIDTH - msgLen) / 2;
+    int y = 22;
+    drawStatusMessageAt(buffer, x, y, msgLen + 5);
+}
+
 void Game::renderBuffer(const std::vector<std::string>& buffer)
 {
     gotoxy(0, 0);
@@ -485,28 +904,6 @@ void Game::renderBuffer(const std::vector<std::string>& buffer)
     }
     if (lastColor != 7) setConsoleColor(7);
     std::cout.flush();
-}
-
-void Game::draw()
-{
-    auto buffer = initBuffer();
-    drawObjectsToBuffer(buffer);
-    drawPlayersToBuffer(buffer);
-    applyLighting(buffer);
-    drawLegendToBuffer(buffer);
-    drawHomeMessage(buffer);
-    if (RiddleMode && currentRiddle) drawRiddle(buffer);
-    renderBuffer(buffer);
-}
-
-void Game::drawHomeMessage(std::vector<std::string>& buffer)
-{
-    if (currentScreen->getScreenId() != ScreenId::HOME) return;
-    if (statusMessage.empty()) return;
-    int msgLen = (int)statusMessage.length();
-    int x = (Screen::WIDTH - msgLen) / 2;
-    int y = 22;
-    drawStatusMessageAt(buffer, x, y, msgLen + 5);
 }
 
 void Game::setConsoleColor(int colorCode)
@@ -572,75 +969,6 @@ void Game::applyLighting(std::vector<std::string>& buffer)
     }
 }
 
-void Game::checkLevelTransition()
-{
-    ScreenId t1 = player1.getCurrentLevel();
-    ScreenId t2 = player2.getCurrentLevel();
-    ScreenId real = currentScreen->getScreenId();
-
-    if (t1 != real && t2 == real && player1.getX() != -1) {
-        setStatusMessage("p1 change Room!");
-        reportEvent("SCREEN_CHANGE", "P1 to " + std::to_string((int)t1));
-        player1.updatepoint(-1, -1);
-    }
-    if (t2 != real && t1 == real && player2.getX() != -1) {
-        setStatusMessage("p2 change Room!");
-        reportEvent("SCREEN_CHANGE", "P2 to " + std::to_string((int)t2));
-        player2.updatepoint(-1, -1);
-    }
-
-    if (t1 != real && t2 != real && t1 == t2) {
-
-        if (t1 == FINAL_LEVEL) {
-            reportEvent("GAME_WON", "Finished Last Level");
-        }
-        playSound(523, 100); // Level Complete Chime (C)
-        playSound(659, 100); // (E)
-        playSound(784, 200); // (G)
-
-        setStatusMessage("Level Complete! +200");
-        player1.addScore(100);
-        player2.addScore(100);
-        player1.saveState();
-        player2.saveState();
-        goToScreen(t1);
-    }
-}
-
-void Game::goToScreen(ScreenId id)
-{
-    currentScreen = &screens[(int)id];
-    int legendBaseX = 0;
-    int legendBaseY = 0;
-
-    if (currentScreen->hasLegendDefined()) {
-        Point lPos = currentScreen->getLegendStart();
-        legendBaseX = lPos.getX();
-        legendBaseY = lPos.getY();
-        const int LEGEND_WIDTH = 75;
-        for (int y = legendBaseY; y <= legendBaseY + 2; ++y) {
-            for (int x = legendBaseX; x < legendBaseX + LEGEND_WIDTH; ++x) {
-                if (y >= 0 && y < Screen::HEIGHT && x >= 0 && x < Screen::WIDTH) {
-                    currentScreen->setChar(x, y, '#');
-                }
-            }
-        }
-    }
-
-    int textRowY = legendBaseY + 1;
-    player1.setHudPosition(legendBaseX + 1, textRowY);
-    player2.setHudPosition(legendBaseX + 17, textRowY);
-
-    Point start1 = currentScreen->getStartPos1();
-    Point start2 = currentScreen->getStartPos2();
-    player1.initForLevel(start1.getX(), start1.getY(), '$', id);
-    player2.initForLevel(start2.getX(), start2.getY(), '&', id);
-
-    setStatusMessage("");
-    if (currentScreen->isDark()) setStatusMessage("Dark Room,Try Torch!");
-    assignRiddlesToLevel();
-}
-
 void Game::ChangeDirection(char c)
 {
     switch (std::tolower(c))
@@ -659,337 +987,15 @@ void Game::ChangeDirection(char c)
     }
 }
 
-
-void Game::handleRiddleInput(char key)
-{
-    if (!currentRiddle || !currentRiddlePlayer) return;
-
-    if (key < '1' || key > '4') { setStatusMessage("Press 1-4"); return; }
-
-    int selected = key - '0';
-    Player& p = *currentRiddlePlayer;
-    std::string pName = (&p == &player1) ? "P1" : "P2";
-
-    if (selected == currentRiddle->getCorrectAnswer()) {
-        reportEvent("RIDDLE", pName + " Correct");
-        playSound(1000, 100); // Correct Sound
-        setStatusMessage("Correct! +100 Points");
-
-        currentRiddlePlayer->addScore(100);
-        currentRiddle->removeFromGame();
-
-        RiddleMode = false;
-        currentRiddle = nullptr;
-        currentRiddlePlayer = nullptr;
-    }
-    else {
-        reportEvent("RIDDLE", pName + " Wrong");
-        playSound(200, 300); // Error Sound
-        p.decreaseLife();
-        reportEvent("LIFE_LOST", pName);
-        setStatusMessage("Wrong! You lost a life.");
-        outputGraphics();
-        if (p.getLive() <= 0) {
-            RiddleMode = false;
-            currentRiddle = nullptr;
-            currentRiddlePlayer = nullptr;
-        }
-    }
-}
-
 void Game::stopMovement()
 {
     player1.setDirection(Direction::STAY);
     player2.setDirection(Direction::STAY);
 }
 
-bool Game::checkPlayerHasRiddle()
-{
-    return player1.hasRiddle() || player2.hasRiddle();
-}
-
-const RiddleData* Game::getRiddleDataById(int id) const {
-    for (const auto& rData : riddlesPool) {
-        if (rData.id == id) {
-            return &rData;
-        }
-    }
-    return nullptr;
-}
-
-void Game::startRiddle(Riddle* riddle, Player& p)
-{
-    if (!riddle) return;
-    std::string pName = (&p == &player1) ? "P1" : "P2";
-    int riddleId = riddle->getData().id;
-    reportEvent("RIDDLE_START", pName + " ID:" + std::to_string(riddleId));
-    currentRiddle = riddle;
-    currentRiddlePlayer = &p;
-    RiddleMode = true;
-    stopMovement();
-    setStatusMessage("Riddle time! Press 1-4 ");
-}
-
-void Game::loadRiddlesFromFile(const std::string& filename)
-{
-    std::ifstream file(filename);
-    if (!file){ throw GameException("Missing Riddles File: " + filename, "Game::loadRiddlesFromFile"); return;}
-    riddlesPool.clear();
-    std::string line;
-    RiddleData current;
-    bool readingText = false;
-    bool shouldShuffle = true;
-
-    while (std::getline(file, line)) {
-        if (!line.empty() && line.back() == '\r') line.pop_back();
-        if (line.find("SHUFFLE:") != std::string::npos) {
-            if (line.find("FALSE") != std::string::npos) shouldShuffle = false;
-            continue;
-        }
-        if (line == "[RIDDLE]") {
-            current = RiddleData();
-            readingText = false;
-        }
-        else if (line.find("ID:") == 0) current.id = std::stoi(line.substr(3));
-        else if (line.find("ANSWER:") == 0) current.correctAnswer = std::stoi(line.substr(7));
-        else if (line == "TEXT") readingText = true;
-        else if (line == "END_TEXT") {
-            readingText = false;
-            riddlesPool.push_back(current);
-        }
-        else if (readingText) current.textLines.push_back(line);
-    }
-    file.close();
-
-    if (shouldShuffle) {
-        std::shuffle(riddlesPool.begin(), riddlesPool.end(), std::default_random_engine(randomSeed));
-    }
-    else {
-        std::sort(riddlesPool.begin(), riddlesPool.end(),
-            [](const RiddleData& a, const RiddleData& b) { return a.id < b.id; });
-        std::reverse(riddlesPool.begin(), riddlesPool.end());
-    }
-}
-
-void Game::assignRiddlesToLevel()
-{
-    for (GameObject* obj : gameObjects) {
-        Riddle* riddle = dynamic_cast<Riddle*>(obj);
-        if (riddle && riddle->getScreenId() == currentScreen->getScreenId()) {
-            if (riddlesPool.empty()) loadRiddlesFromFile("Riddles.txt");
-            if (!riddlesPool.empty()) {
-                RiddleData data = riddlesPool.back();
-                riddlesPool.pop_back();
-                riddle->setData(data);
-            }
-        }
-    }
-}
-
-void Game::pauseScreen()
-{
-    int x = (Screen::WIDTH - 37) / 2;
-    int y = (Screen::HEIGHT - 6) / 2;
-    if (!isSilentMode()) {
-        gotoxy(x, y);     std::cout << "*************************************";
-        gotoxy(x, y + 1); std::cout << "* GAME PAUSED                       *";
-        gotoxy(x, y + 2); std::cout << "*                                   *";
-        gotoxy(x, y + 3); std::cout << "* [ESC] Continue                    *";
-        gotoxy(x, y + 4); std::cout << "* [S]   Save Current State          *";
-        gotoxy(x, y + 5); std::cout << "* [H]   Exit to Main Menu           *";
-        gotoxy(x, y + 6); std::cout << "*************************************";
-    }
-    while (true) {
-        // גם כאן - שימוש ב-getNextChar הוירטואלי!
-        char key = getNextChar();
-
-        if (key == 0) continue;
-
-        if (key == 27) return; // ESC
-
-        if (key == 's' || key == 'S') {
-            if (!allowSaveLoad()) {
-                setStatusMessage("Save disabled during recording/playback!");
-                gotoxy(x + 2, y + 2); std::cout << "Save disabled during recording/playback!";
-            }
-            else {
-                try {
-                    saveGameState("savegame.sav");
-                    gotoxy(x + 2, y + 2); std::cout << "      Game Saved Successfully!     ";
-                    handleSleep(); // שימוש בשינה וירטואלית
-                    return;
-                }
-                catch (...) {
-                    setStatusMessage("Save Failed!");
-                }
-            }
-        }
-
-        if (key == 'h' || key == 'H') {
-            reportEvent("GAME_ENDED", "User Quit to Menu");
-            endSession();
-            goToScreen(ScreenId::HOME);
-            setStatusMessage("");
-            return;
-        }
-    }
-}
-
-void Game::updateBombs()
-{
-    ScreenId curr_screen = currentScreen->getScreenId();
-    for (auto obj : gameObjects) {
-        if (pendingRestart || exitToMainMenu) return;
-        auto bomb = dynamic_cast<Bomb*>(obj);
-        if (!bomb || bomb->getScreenId() != curr_screen) continue;
-
-        if (bomb->tick()) {
-            std::string location = std::to_string(bomb->getX()) + "," + std::to_string(bomb->getY());
-            reportEvent("BOMB_EXPLODE", location);
-            playSound(150, 150); // Now async!
-            Point c = bomb->getPoint();
-            int radius = Bomb::getExplosionRadius();
-            visualizeExplosion(c.getX(), c.getY(), radius);
-            applyBombEffects(c.getX(), c.getY(), *currentScreen, radius);
-            if (pendingRestart || exitToMainMenu) return;
-            bomb->removeFromGame();
-            setStatusMessage("BOOM!");
-        }
-    }
-}
-
-void Game::applyBombEffects(int cx, int cy, Screen& curr_screen, int R)
-{
-    for (int y = cy - R; y <= cy + R; ++y) {
-        for (int x = cx - R; x <= cx + R; ++x) {
-            if (!curr_screen.inBounds(x, y)) continue;
-            explodeCell(x, y, curr_screen);
-        }
-    }
-}
-
-void Game::explodeCell(int x, int y, Screen& screen)
-{
-    if (player1.getX() == x && player1.getY() == y) { reportEvent("LIFE_LOST", "P1"); player1.decreaseLife(); }
-    if (player2.getX() == x && player2.getY() == y) { reportEvent("LIFE_LOST", "P2"); player2.decreaseLife(); }
-
-    bool isBorder = (x == 0 || x == Screen::WIDTH - 1 || y == 0 || y == Screen::HEIGHT - 1);
-    bool isLegendArea = false;
-    if (screen.hasLegendDefined()) {
-        Point lPos = screen.getLegendStart();
-        if (x >= lPos.getX() && x < lPos.getX() + Screen::LEGEND_WIDTH &&
-            y >= lPos.getY() && y <= lPos.getY() + 2) {
-            isLegendArea = true;
-        }
-    }
-
-    if (!isBorder && !isLegendArea) {
-        if (screen.getLine(y)[x] == '#') screen.setChar(x, y, ' ');
-    }
-
-    for (auto obj : gameObjects) {
-        if (!obj || obj->getScreenId() != screen.getScreenId()) continue;
-        if (obj->getX() < 0 || obj->getY() < 0) continue;
-        if (obj->isCollected()) continue;
-
-        if (obj->isAtPosition(x, y)) {
-            if (auto key = dynamic_cast<Key*>(obj)) {
-                gameOverScreen("Mission Failed: Key Destroyed!");
-                return;
-            }
-            if (auto door = dynamic_cast<Door*>(obj)) {
-                gameOverScreen("Mission Failed: Door Destroyed!");
-                return;
-            }
-            if (dynamic_cast<Bomb*>(obj)) continue;
-            if (obj->handleExplosionAt(x, y)) {
-                obj->removeFromGame();
-            }
-        }
-    }
-}
-
-
-void Game::visualizeExplosion(int cx, int cy, int radius)
-{
-    if (isSilentMode()) return;
-    for (int y = cy - radius; y <= cy + radius; ++y) {
-        for (int x = cx - radius; x <= cx + radius; ++x) {
-            if (x >= 0 && x < Screen::WIDTH && y >= 0 && y < Screen::HEIGHT) {
-                gotoxy(x, y);
-                if (colorEnabled) setConsoleColor(14);
-                std::cout << "+";
-                if (colorEnabled) setConsoleColor(7);
-            }
-        }
-    }
-    gotoxy(0, 0);
-    // השתמש ב-handleSleep הוירטואלי פעמיים במקום Sleep רגיל
-    handleSleep();
-    handleSleep();
-}
-
-void Game::processPlayerMovement(Player& p, Player* other)
-{
-    // חישוב מספר הצעדים בטיק אחד (תלוי במהירות/תעופה)
-    int steps = p.isFlying() ? p.getSpeed() : 1;
-
-    for (int i = 0; i < steps; ++i) {
-        p.move(*currentScreen, gameObjects, other);
-
-        // אם השחקן נחת או נעצר באמצע התעופה, מפסיקים את הלולאה הנוכחית
-        if (!p.isFlying() && steps > 1) break;
-    }
-}
-
-void Game::handleInteractions()
-{
-    if (RiddleMode) return; // אם כבר בחידה, לא עושים כלום
-
-    // בדיקה האם שחקן 1 דרך על חידה
-    if (player1.getInteractingRiddle() != nullptr) {
-        startRiddle(player1.getInteractingRiddle(), player1);
-        player1.clearInteractingRiddle();
-    }
-    // בדיקה האם שחקן 2 דרך על חידה
-    else if (player2.getInteractingRiddle() != nullptr) {
-        startRiddle(player2.getInteractingRiddle(), player2);
-        player2.clearInteractingRiddle();
-    }
-}
-
-void Game::checkGameStatus()
-{
-    // מתעלמים אם אנחנו כבר בתהליך יציאה או אתחול
-    if (pendingRestart || exitToMainMenu) return;
-
-    if (player1.getLive() <= 0) {
-        gameOverScreen("Player 1 ran out of lives!");
-    }
-    else if (player2.getLive() <= 0) {
-        gameOverScreen("Player 2 ran out of lives!");
-    }
-}
-
-void Game::handleFlowControl()
-{
-    // אתחול שלב (Restart Level)
-    if (pendingRestart) {
-        pendingRestart = false;
-        restartCurrentLevel();
-        return;
-    }
-
-    // יציאה לתפריט ראשי
-    if (exitToMainMenu) {
-        exitToMainMenu = false;
-        player1.stopMovement();
-        player2.stopMovement();
-        resetGame();
-        goToScreen(ScreenId::HOME);
-        return;
-    }
-}
+// =============================================================
+//               SAVE / LOAD SYSTEM
+// =============================================================
 
 GameObject* Game::createObjectFromSave(const std::string& type, std::stringstream& ss)
 {
@@ -1022,9 +1028,7 @@ GameObject* Game::createObjectFromSave(const std::string& type, std::stringstrea
         int id, target, locked;
         ss >> id >> target >> locked;
 
-        // התיקון הגדול: נרמול ה-ID לתצוגה
-        // אם ה-ID הוא 100, נחלק ב-100 ונקבל 1 -> יהפוך לתו '1'
-        // אם ה-ID הוא 300, נחלק ב-100 ונקבל 3 -> יהפוך לתו '3'
+        // Fix: Normalize ID for display
         int visualDigit = id;
         if (visualDigit >= 100) {
             visualDigit /= 100;
@@ -1074,20 +1078,16 @@ GameObject* Game::createObjectFromSave(const std::string& type, std::stringstrea
     }
     else if (type == "RIDDLE") {
         int riddleId;
-        ss >> riddleId; // קריאת ה-ID ששמרנו
+        ss >> riddleId;
 
         Riddle* newRiddle = new Riddle(x, y, currentScreen->getScreenId());
 
-        // אם יש ID תקין, אנחנו מחפשים את השאלה במאגר ומכניסים אותה לאובייקט
         if (riddleId != -1) {
             const RiddleData* foundData = getRiddleDataById(riddleId);
             if (foundData) {
                 newRiddle->setData(*foundData);
             }
         }
-        // אם לא מצאנו (או שה-ID הוא -1), החידה תישאר ריקה ונטפל בה 
-        // אולי בפונקציה אחרת, אבל לרוב בשמירה יש כבר חידה פעילה.
-
         return newRiddle;
     }
 
@@ -1109,14 +1109,14 @@ void Game::saveGameState(const std::string& filename)
     }
     file << "END_MAP" << std::endl;
 
-    // === תיקון בעיית המעבר בדלת ===
-    // אנחנו שומרים ידנית את ה-ScreenID של כל שחקן ליד המידע שלו
+    // === Fix: Save Player Screen ID ===
+    // We manually save each player's ScreenID next to their data
     file << player1.getSaveData(1) << " " << (int)player1.getCurrentLevel() << std::endl;
     file << player2.getSaveData(2) << " " << (int)player2.getCurrentLevel() << std::endl;
 
     file << "OBJECTS_START" << std::endl;
     for (auto obj : gameObjects) {
-        // שומרים רק אובייקטים של המסך הנוכחי (לפי השיטה שלך)
+        // Only save objects from the current screen
         if (obj->getScreenId() == currentScreen->getScreenId()) {
             file << obj->getTypeName() << " " << obj->getSaveData() << std::endl;
         }
@@ -1126,7 +1126,7 @@ void Game::saveGameState(const std::string& filename)
     file.close();
 }
 
-// מבנה עזר לחיבור מתגים (בתוך Game.cpp, לפני loadGameState)
+// Helper struct for linking switches (local to this file)
 struct PendingSwitch {
     Switch* s;
     std::vector<std::pair<int, int>> targets;
@@ -1145,7 +1145,7 @@ void Game::loadGameState(const std::string& filename)
     int p1ItemX = -1, p1ItemY = -1;
     int p2ItemX = -1, p2ItemY = -1;
 
-    // רשימה לחיבור מתגים
+    // List for connecting switches
     std::vector<PendingSwitch> switchLinks;
 
     while (file >> cmd)
@@ -1153,17 +1153,17 @@ void Game::loadGameState(const std::string& filename)
         if (cmd == "SCREEN_ID") {
             file >> savedScreenId;
 
-            // 1. עדכון המסך הנוכחי
+            // 1. Update current screen
             currentScreen = &screens[savedScreenId];
 
-            // === התיקון הקריטי: שחזור ה-Legend וה-HUD ===
+            // === Critical Fix: Restore Legend and HUD ===
             if (currentScreen->hasLegendDefined()) {
                 Point lPos = currentScreen->getLegendStart();
                 int legendBaseX = lPos.getX();
                 int legendBaseY = lPos.getY();
                 const int LEGEND_WIDTH = 75;
 
-                // א. ציור מחדש של המסגרת (ליתר ביטחון, למקרה שהקובץ לא שמר אותה)
+                // A. Redraw the border (in case file didn't save it)
                 for (int y = legendBaseY; y <= legendBaseY + 2; ++y) {
                     for (int x = legendBaseX; x < legendBaseX + LEGEND_WIDTH; ++x) {
                         if (y >= 0 && y < Screen::HEIGHT && x >= 0 && x < Screen::WIDTH) {
@@ -1172,14 +1172,14 @@ void Game::loadGameState(const std::string& filename)
                     }
                 }
 
-                // ב. עדכון השחקנים איפה להדפיס את הטקסט!
+                // B. Update players text position
                 int textRowY = legendBaseY + 1;
                 player1.setHudPosition(legendBaseX + 1, textRowY);
                 player2.setHudPosition(legendBaseX + 17, textRowY);
             }
             // ==============================================
 
-            // ניקוי אובייקטים מהמסך שנטען
+            // Clear objects from loaded screen
             auto it = gameObjects.begin();
             while (it != gameObjects.end()) {
                 if ((*it)->getScreenId() == (ScreenId)savedScreenId) {
@@ -1201,7 +1201,6 @@ void Game::loadGameState(const std::string& filename)
             }
             currentScreen->setLayout(newLayout);
         }
-        // ... (המשך הקוד נשאר אותו דבר: PLAYER, OBJECTS וכו') ...
         else if (cmd == "PLAYER") {
             int id, x, y, lives, score, itemX, itemY, levelId;
             file >> id >> x >> y >> lives >> score >> itemX >> itemY >> levelId;
@@ -1233,7 +1232,7 @@ void Game::loadGameState(const std::string& filename)
         }
     }
 
-    // חיבור מתגים וחפצים (כמו בקוד הקודם)
+    // Connect switches and items
     for (auto& link : switchLinks) {
         for (auto& coord : link.targets) {
             GameObject* targetObj = findObjectAt(coord.first, coord.second);
@@ -1254,4 +1253,26 @@ GameObject* Game::findObjectAt(int x, int y)
         }
     }
     return nullptr;
+}
+
+// =============================================================
+//               AUDIO SYSTEM
+// =============================================================
+
+// Wrapper function for report - delegates to children
+void Game::reportEvent(const std::string& type, const std::string& details) {
+    handleEventReport(type, details);
+}
+
+// Non-Blocking Sound System
+bool Game::isSoundEnabled() { return soundEnabled; }
+
+void Game::playSound(int frequency, int duration)
+{
+    if (!soundEnabled) return;
+
+    // Run Beep in a separate thread so it doesn't freeze the game loop
+    std::thread([frequency, duration]() {
+        Beep(frequency, duration);
+        }).detach();
 }

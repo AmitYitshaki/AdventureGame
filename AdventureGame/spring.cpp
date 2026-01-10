@@ -2,28 +2,44 @@
 #include "Player.h"
 #include "Screen.h"
 
+// === Utility Helpers ===
 Direction Spring::oppositeDirection(Direction d)
 {
     switch (d) {
-    case Direction::UP:    return Direction::DOWN;
-    case Direction::DOWN:  return Direction::UP;
-    case Direction::LEFT:  return Direction::RIGHT;
-    case Direction::RIGHT: return Direction::LEFT;
-    default:               return Direction::STAY;
+    case Direction::UP:
+        return Direction::DOWN;
+    case Direction::DOWN:
+        return Direction::UP;
+    case Direction::LEFT:
+        return Direction::RIGHT;
+    case Direction::RIGHT:
+        return Direction::LEFT;
+    default:
+        return Direction::STAY;
     }
 }
 
 void Spring::getDelta(Direction d, int& dx, int& dy)
 {
-    dx = 0; dy = 0;
+    dx = 0;
+    dy = 0;
     switch (d) {
-    case Direction::UP:    dy = -1; break;
-    case Direction::DOWN:  dy = 1;  break;
-    case Direction::LEFT:  dx = -1; break;
-    case Direction::RIGHT: dx = 1;  break;
+    case Direction::UP:
+        dy = -1;
+        break;
+    case Direction::DOWN:
+        dy = 1;
+        break;
+    case Direction::LEFT:
+        dx = -1;
+        break;
+    case Direction::RIGHT:
+        dx = 1;
+        break;
     }
 }
 
+// === Construction ===
 Spring::Spring(const Point& basePosition, Direction dir, ScreenId screenId, int length)
     : GameObject(basePosition.getX(), basePosition.getY(), 'W', screenId, false, false),
     direction(dir)
@@ -31,25 +47,30 @@ Spring::Spring(const Point& basePosition, Direction dir, ScreenId screenId, int 
     rebuild(dir, length);
 }
 
+// === Rendering ===
 void Spring::drawToBuffer(std::vector<std::string>& buffer) const
 {
     for (const auto& p : parts) {
         int x = p.getX();
         int y = p.getY();
-        if (x >= 0 && y >= 0 && y < (int)buffer.size() && x < (int)buffer[y].size()) {
+        if (x >= 0 && y >= 0 && y < static_cast<int>(buffer.size()) && x < static_cast<int>(buffer[y].size())) {
             buffer[y][x] = p.getChar();
         }
     }
 }
 
+// === Queries ===
 bool Spring::isAtPosition(int x, int y) const
 {
     for (const auto& p : parts) {
-        if (p.getX() == x && p.getY() == y) return true;
+        if (p.getX() == x && p.getY() == y) {
+            return true;
+        }
     }
     return false;
 }
 
+// === Configuration ===
 void Spring::rebuild(Direction dir, int length)
 {
     parts.clear();
@@ -58,7 +79,8 @@ void Spring::rebuild(Direction dir, int length)
 
     int startX = getX();
     int startY = getY();
-    int dx, dy;
+    int dx;
+    int dy;
     getDelta(dir, dx, dy);
 
     for (int i = 0; i < length; ++i)
@@ -70,23 +92,29 @@ void Spring::rebuild(Direction dir, int length)
 
 void Spring::setDirection(Direction newDir)
 {
-    if (parts.empty()) return;
+    if (parts.empty()) {
+        return;
+    }
     direction = newDir;
     oppositeDir = oppositeDirection(newDir);
 
     int startX = parts[0].getX();
     int startY = parts[0].getY();
-    int dx, dy;
+    int dx;
+    int dy;
     getDelta(direction, dx, dy);
 
     for (size_t i = 0; i < parts.size(); ++i) {
-        parts[i].setPos(startX + (int)i * dx, startY + (int)i * dy);
+        parts[i].setPos(startX + static_cast<int>(i) * dx, startY + static_cast<int>(i) * dy);
     }
 }
 
+// === Collision Handling ===
 bool Spring::handleCollision(Player& p, const Screen& screen)
 {
-    if (parts.empty()) return true;
+    if (parts.empty()) {
+        return true;
+    }
 
     int px = p.getX();
     int py = p.getY();
@@ -94,12 +122,14 @@ bool Spring::handleCollision(Player& p, const Screen& screen)
 
     for (size_t i = 0; i < parts.size(); ++i) {
         if (parts[i].getX() == px && parts[i].getY() == py) {
-            hitIndex = (int)i;
+            hitIndex = static_cast<int>(i);
             break;
         }
     }
 
-    if (hitIndex == -1) return true;
+    if (hitIndex == -1) {
+        return true;
+    }
 
     if (p.isFlying()) {
         for (size_t i = 0; i < parts.size(); ++i) {
@@ -117,16 +147,20 @@ bool Spring::handleCollision(Player& p, const Screen& screen)
     parts[hitIndex].setChar('_');
 
     if (hitIndex == 0) {
-        for (auto& pt : parts) pt.setChar('_');
+        for (auto& pt : parts) {
+            pt.setChar('_');
+        }
         p.setLaunchDirection(direction);
-        p.launch((int)parts.size());
+        p.launch(static_cast<int>(parts.size()));
         return true;
     }
 
     if (pDir == Direction::STAY) {
         p.setLaunchDirection(direction);
-        int power = (int)parts.size() - hitIndex;
-        if (power < 2) power = 2;
+        int power = static_cast<int>(parts.size()) - hitIndex;
+        if (power < 2) {
+            power = 2;
+        }
         p.launch(power);
         return true;
     }
@@ -134,30 +168,44 @@ bool Spring::handleCollision(Player& p, const Screen& screen)
     return true;
 }
 
+// === Explosions ===
 bool Spring::handleExplosionAt(int x, int y)
 {
-    if (parts.empty()) return true;
+    if (parts.empty()) {
+        return true;
+    }
 
     for (auto it = parts.begin(); it != parts.end(); ++it)
     {
         if (it->getX() == x && it->getY() == y) {
             bool isBase = (it == parts.begin());
             parts.erase(it);
-            if (isBase) return true;
+            if (isBase) {
+                return true;
+            }
             break;
         }
     }
     return parts.empty();
 }
 
+// === Serialization ===
 std::string Spring::getTypeName() const { return "SPRING"; }
-std::string Spring::getSaveData() const {
+
+std::string Spring::getSaveData() const
+{
     // Format: X Y Direction(char) TargetScreen Length
     char dirC = 'U';
-    if (direction == Direction::DOWN) dirC = 'D';
-    if (direction == Direction::LEFT) dirC = 'L';
-    if (direction == Direction::RIGHT) dirC = 'R';
+    if (direction == Direction::DOWN) {
+        dirC = 'D';
+    }
+    if (direction == Direction::LEFT) {
+        dirC = 'L';
+    }
+    if (direction == Direction::RIGHT) {
+        dirC = 'R';
+    }
 
     return GameObject::getSaveData() + " " + dirC + " " +
-        std::to_string((int)getScreenId()) + " " + std::to_string(getLength());
+        std::to_string(static_cast<int>(getScreenId())) + " " + std::to_string(getLength());
 }

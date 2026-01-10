@@ -42,7 +42,7 @@
 #include "Switch.h"
 #include "Laser.h"
 
-// מבנה עזר לאירועים (נשאר כמו שהיה)
+// Helper struct for game events
 struct GameEvent {
     long cycle;
     std::string type;
@@ -58,68 +58,83 @@ public:
     Game();
     virtual ~Game();
 
-    // מחיקת העתקות למניעת באגים
+    // Delete copy constructor/assignment to prevent logic errors
     Game(const Game&) = delete;
     Game& operator=(const Game&) = delete;
 
-    // הפונקציה הראשית שמפעילה את המשחק
+    // Main entry point to start the game loop
     void start();
 
-    // סטטי כדי שיהיה נגיש לכולם
+    // Static accessors for global functionality
     static void playSound(int frequency, int duration);
     static void setStatusMessage(const std::string& msg);
 
 protected:
-    // === VIRTUAL INTERFACE (החלק הפולימורפי) ===
-    // כל יורש חייב לממש איך הוא מביא את התו הבא (מהמקלדת או מהקובץ)
+    // =========================================================
+    //                    VIRTUAL INTERFACE
+    // =========================================================
+
+    // Abstract: Must implement input source (Keyboard vs File)
     virtual char getNextChar() = 0;
 
-    // כל יורש מטפל בדיווחים אחרת (כתיבה לקובץ או אימות מול צפי)
+    // Abstract: Must implement event handling (Recording vs Verification)
     virtual void handleEventReport(const std::string& type, const std::string& details) = 0;
 
-    // אתחול ספציפי (תפריט במקלדת, טעינת קבצים בקובץ)
+    // Abstract: Session lifecycle hooks
     virtual void initSession() = 0;
-
-    // סיום ספציפי (סגירת הקלטה, הדפסת דוח מבחן)
     virtual void endSession() = 0;
 
-    // ניהול זמן (FileGame ידרוס את זה ב-Silent כדי לרוץ מהר)
-    virtual void handleSleep();
+    // Virtual: Can be overridden for specific behavior
+    virtual void resetGame(); // Overridden by KeyBoardGame to reset recording
+    virtual void handleSleep(); // Overridden by FileGame for speed
+    virtual void outputGraphics(); // Overridden by FileGame for silent mode
 
-    // ציור (FileGame ידרוס את זה ב-Silent כדי לא לצייר)
-    virtual void outputGraphics();
+    // Configuration Hooks
+    virtual bool allowSaveLoad() const { return true; }
+    virtual bool isSilentMode() const { return false; }
 
 protected:
-    // === COMMON LOGIC (פונקציות עזר משותפות) ===
+    // =========================================================
+    //                     CORE LOGIC
+    // =========================================================
+
     void update();
-    void draw(); // הציור הפיזי לבאפר
     void handleInput();
+    void draw(); // Physical rendering to buffer
     void initGame();
-    virtual void resetGame();
     void end() { isRunning = false; }
 
-    // עטיפה לדיווח שקוראת לפונקציה הוירטואלית
-   virtual void reportEvent(const std::string& type, const std::string& details);
+    // Wrapper to invoke virtual event reporting
+    void reportEvent(const std::string& type, const std::string& details);
 
-    // --- Helpers (אותן פונקציות שהיו לך קודם) ---
+    // =========================================================
+    //                    GAME MECHANICS
+    // =========================================================
+
+    // Entity Management
     void cleanupDeadObjects();
     void processPlayerMovement(Player& p, Player* other);
     void handleInteractions();
     void checkGameStatus();
     void handleFlowControl();
-
-    // --- Specific Mechanics ---
     void updateBombs();
+
+    // Mechanics & Effects
     void visualizeExplosion(int cx, int cy, int radius);
     void applyBombEffects(int cx, int cy, Screen& curr_screen, int R);
     void explodeCell(int x, int y, Screen& screen);
+
+    // Level Management
     void checkLevelTransition();
     void goToScreen(ScreenId id);
-    void gameOverScreen(const std::string& message);
     void restartCurrentLevel();
-    void pauseScreen(); // שים לב: זה יצטרך שינוי קטן ב-cpp כדי להשתמש ב-getNextChar
+    void gameOverScreen(const std::string& message);
+    void pauseScreen();
 
-    // --- Riddles ---
+    // =========================================================
+    //                    RIDDLE SYSTEM
+    // =========================================================
+
     void handleRiddleInput(char key);
     void startRiddle(Riddle* riddle, Player& p);
     void loadRiddlesFromFile(const std::string& filename);
@@ -127,17 +142,24 @@ protected:
     bool checkPlayerHasRiddle();
     const RiddleData* getRiddleDataById(int id) const;
 
-    // --- Save/Load Game State ---
+    // =========================================================
+    //                  SAVE / LOAD SYSTEM
+    // =========================================================
+
     void saveGameState(const std::string& filename);
     void loadGameState(const std::string& filename);
     GameObject* createObjectFromSave(const std::string& type, std::stringstream& ss);
     GameObject* findObjectAt(int x, int y);
 
-    // --- Drawing Internals ---
+    // =========================================================
+    //                  GRAPHICS & RENDERING
+    // =========================================================
+
     std::vector<std::string> initBuffer();
     void writeToBuffer(std::vector<std::string>& buffer, int x, int y, char c);
     void writeHudText(std::vector<std::string>& buffer, int x, int y, const std::string& text);
     void renderBuffer(const std::vector<std::string>& buffer);
+
     void drawObjectsToBuffer(std::vector<std::string>& buffer);
     void drawPlayersToBuffer(std::vector<std::string>& buffer);
     void drawLegendToBuffer(std::vector<std::string>& buffer);
@@ -145,32 +167,39 @@ protected:
     void drawRiddle(std::vector<std::string>& buffer);
     void drawHomeMessage(std::vector<std::string>& buffer);
     void applyLighting(std::vector<std::string>& buffer);
+
     int resolveColor(char c, int x, int y);
     void setConsoleColor(int colorCode);
     int getColorForChar(char c);
     void ChangeDirection(char c);
     void stopMovement();
 
+    // Toggles
     void toggleColor() { colorEnabled = !colorEnabled; }
     void toggleSound() { soundEnabled = !soundEnabled; }
     bool isColorEnabled() const { return colorEnabled; }
     static bool isSoundEnabled();
 
 protected:
-    // === SHARED DATA MEMBERS ===
+    // =========================================================
+    //                     DATA MEMBERS
+    // =========================================================
+
     static constexpr int TICK_MS = 64;
     static constexpr ScreenId FINAL_LEVEL = ScreenId::ROOM4;
 
+    // Entities
     Player player1;
     Player player2;
     Screen screens[(int)ScreenId::NumOfScreens];
     Screen* currentScreen = nullptr;
     std::vector<GameObject*> gameObjects;
 
+    // State
     bool isRunning = true;
     unsigned long cycleCounter = 0;
     unsigned int randomSeed = 0;
-    bool isGameSessionActive = false; // האם אנחנו בתוך משחק פעיל
+    bool isGameSessionActive = false;
 
     // Flags
     bool RiddleMode = false;
@@ -180,19 +209,16 @@ protected:
     bool exitToMainMenu = false;
     bool pendingRestart = false;
     bool colorEnabled = true;
+
+    // Statics
     static bool soundEnabled;
     static std::string statusMessage;
-    // האם מותר לשמור/לטעון את מצב המשחק (State)?
-    virtual bool allowSaveLoad() const { return true; }
-
-    // האם אנחנו במצב שקט? (ברירת מחדל: לא)
-    virtual bool isSilentMode() const { return false; }
 };
 
 // =============================================================
 //               DERIVED CLASS: KeyBoardGame
 // =============================================================
-// אחראית על משחק אינטראקטיבי ועל הקלטה (Save Mode)
+// Handles interactive gameplay and recording (Save Mode)
 class KeyBoardGame : public Game
 {
 public:
@@ -200,13 +226,16 @@ public:
     virtual ~KeyBoardGame();
 
 protected:
-    // מימושים וירטואליים
+    // Virtual Implementations
     virtual char getNextChar() override;
     virtual void handleEventReport(const std::string& type, const std::string& details) override;
     virtual void initSession() override;
     virtual void endSession() override;
-    virtual bool allowSaveLoad() const override { return !isRecording; }
     virtual void resetGame() override;
+
+    // Configuration Overrides
+    virtual bool allowSaveLoad() const override { return !isRecording; }
+
 private:
     bool isRecording;
     std::ofstream stepsFileOut;
@@ -216,7 +245,7 @@ private:
 // =============================================================
 //               DERIVED CLASS: FileGame
 // =============================================================
-// אחראית על ניגון הקלטות ועל בדיקות אוטומטיות (Load/Silent Mode)
+// Handles playback and automated testing (Load/Silent Mode)
 class FileGame : public Game
 {
 public:
@@ -224,18 +253,19 @@ public:
     virtual ~FileGame();
 
 protected:
-    // מימושים וירטואליים
+    // Virtual Implementations
     virtual char getNextChar() override;
     virtual void handleEventReport(const std::string& type, const std::string& details) override;
     virtual void initSession() override;
     virtual void endSession() override;
-    virtual bool isSilentMode() const override { return isSilent; }
-    virtual bool allowSaveLoad() const override { return false; }
 
-    // דריסות מיוחדות למצב Silent
+    // Silent Mode Optimizations
     virtual void handleSleep() override;
     virtual void outputGraphics() override;
-    
+
+    // Configuration Overrides
+    virtual bool isSilentMode() const override { return isSilent; }
+    virtual bool allowSaveLoad() const override { return false; }
 
 private:
     void loadExpectedResults();
@@ -247,7 +277,7 @@ private:
     std::vector<std::pair<long, char>> stepsBuffer;
     size_t playbackIndex = 0;
 
-    // אימות תוצאות
+    // Verification Data
     std::deque<GameEvent> expectedResults;
     bool testFailed = false;
     std::string failureReason;

@@ -1,4 +1,4 @@
-﻿#pragma once
+﻿﻿#pragma once
 #include "Point.h"
 #include "Direction.h"
 #include "ScreenID.h"
@@ -80,7 +80,7 @@ public:
     int getY() const { return point.getY(); }
     char getChar() const { return point.getChar(); }
     Direction getDirection() const { return dir; }
-	Direction getLaunchDirection() const { return launchDirection; }
+    Direction getLaunchDirection() const { return launchDirection; }
     void setDirection(Direction d) { dir = d; }
     int getHudX() const { return hudX; }
     int getHudY() const { return hudY; }
@@ -88,7 +88,7 @@ public:
     ScreenId getCurrentLevel() const { return currentLevel; }
     void setCurrentLevel(ScreenId id) { currentLevel = id; }
     bool isHoldingItem(const GameObject* obj) const { return heldItem == obj; }
-    void forceDropItem() {heldItem = nullptr; } // Disconnect without triggering logic
+    void forceDropItem() { heldItem = nullptr; } // Disconnect without triggering logic
 
     // Physics
     int getSpeed() const { return speed; }
@@ -101,6 +101,7 @@ public:
     void updateSpringEffect();
     void stopSpringEffect();
 
+    // Persistence
     std::string getSaveData(int id) const;
 
 private:

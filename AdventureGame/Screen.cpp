@@ -2,6 +2,7 @@
 #include "Utils.h"
 #include <iostream>
 
+// === Rendering ===
 void Screen::draw() const
 {
     gotoxy(0, 0);
@@ -11,17 +12,22 @@ void Screen::draw() const
     }
 }
 
+// === Layout Access ===
 const std::string& Screen::getLine(int row) const
 {
     static const std::string emptyLine = "";
-    if (row >= 0 && row < (int)layout.size()) return layout[row];
+    if (row >= 0 && row < static_cast<int>(layout.size())) {
+        return layout[row];
+    }
     return emptyLine;
 }
 
 void Screen::setLine(int row, const std::string& line)
 {
     if (row >= 0 && row < HEIGHT) {
-        if (layout.size() < HEIGHT) layout.resize(HEIGHT, std::string(WIDTH, ' '));
+        if (layout.size() < HEIGHT) {
+            layout.resize(HEIGHT, std::string(WIDTH, ' '));
+        }
         layout[row] = line;
     }
 }

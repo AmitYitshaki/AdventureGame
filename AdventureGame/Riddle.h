@@ -1,4 +1,4 @@
-﻿#pragma once
+﻿﻿#pragma once
 #include "GameObject.h"
 #include <vector>
 #include <string>
@@ -22,7 +22,7 @@
  * ===================================================================================
  */
 
-struct RiddleData {
+    struct RiddleData {
     int id = -1;
     int correctAnswer = 1;
     std::vector<std::string> textLines;
@@ -30,18 +30,16 @@ struct RiddleData {
 
 class Riddle : public GameObject
 {
-private:
-    RiddleData data;
-    bool solved = false;
-
 public:
     static constexpr int WIDTH = 76;
     static constexpr int HEIGHT = 22;
 
+    // --- Construction ---
     Riddle(int x, int y, ScreenId screen) : GameObject(x, y, '?', screen) {}
 
+    // --- Riddle Data ---
     void setData(const RiddleData& newData) { data = newData; }
-	const RiddleData& getData() const { return data; }
+    const RiddleData& getData() const { return data; }
     int getCorrectAnswer() const { return data.correctAnswer; }
 
     const char* getLine(int row) const {
@@ -51,7 +49,11 @@ public:
 
     bool handleCollision(Player& p, const Screen& screen) override;
     std::string getTypeName() const override { return "RIDDLE"; }
-    // Riddle typically handles its own internal data via ID, 
-    // assuming we don't need to save 'solved' state if it disappears when solved.
+    // Riddle typically handles its own internal data via ID, so we do not
+    // persist the solved state when it disappears after completion.
     std::string getSaveData() const override;
+
+private:
+    RiddleData data;
+    bool solved = false;
 };

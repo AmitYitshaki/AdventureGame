@@ -1,4 +1,4 @@
-﻿#pragma once
+﻿﻿#pragma once
 #include "GameObject.h"
 
 /*
@@ -22,18 +22,23 @@
 
 class Bomb : public GameObject
 {
+public:
+	// --- Construction ---
+	Bomb(int x, int y, ScreenId screen);
+
+	// --- GameObject Overrides ---
+	bool handleCollision(Player& p, const Screen& screen) override;
+	std::string getTypeName() const override;
+	std::string getSaveData() const override;
+
+	// --- State ---
+	void activate();
+	static constexpr int getExplosionRadius() { return EXPLOSION_RADIUS; }
+	bool tick();
+
 private:
 	bool active = false;
 	int ticksLeft;
 	static constexpr int COUNTDOWN_TICKS = 24;
 	static constexpr int EXPLOSION_RADIUS = 3;
-
-public:
-	Bomb(int x, int y, ScreenId screen);
-	bool handleCollision(Player& p, const Screen& screen) override;
-	void activate();
-	static constexpr int getExplosionRadius() { return EXPLOSION_RADIUS; }
-	bool tick();
-	std::string getTypeName() const override;
-	std::string getSaveData() const override;
 };

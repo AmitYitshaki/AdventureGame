@@ -22,17 +22,21 @@ class Player;
 
 class Door : public GameObject
 {
+public:
+    // --- Construction ---
+    Door(int x, int y, char c, ScreenId screen, int id, ScreenId leadsToScreen, bool isLocked);
+
+    // --- Door State ---
+    void setDoorProperties(int id, ScreenId targetScreen, bool isLocked);
+    bool unlock(Player& player);
+
+    // --- GameObject Overrides ---
+    bool handleCollision(Player& p, const Screen& screen) override;
+    std::string getTypeName() const override;
+    std::string getSaveData() const override;
+
 private:
     int doorID;
     bool locked;
     ScreenId leadsTo;
-
-public:
-    Door(int x, int y, char c, ScreenId screen, int id, ScreenId leadsToScreen, bool isLocked);
-
-    void setDoorProperties(int id, ScreenId targetScreen, bool isLocked);
-    bool unlock(Player& player);
-    bool handleCollision(Player& p, const Screen& screen) override;
-    std::string getTypeName() const override;
-    std::string getSaveData() const override;
 };

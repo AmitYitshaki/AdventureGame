@@ -1,6 +1,7 @@
 ﻿#include "Bomb.h"
 #include "Player.h"
 
+// === Construction ===
 Bomb::Bomb(int x, int y, ScreenId screen)
     : GameObject(x, y, '@', screen, true, false)
 {
@@ -8,28 +9,42 @@ Bomb::Bomb(int x, int y, ScreenId screen)
     ticksLeft = COUNTDOWN_TICKS;
 }
 
+// === Activation ===
 void Bomb::activate()
 {
     active = true;
     ticksLeft = COUNTDOWN_TICKS;
 }
 
+// === Collision Handling ===
 bool Bomb::handleCollision(Player& p, const Screen&)
 {
-    if (!active && !isCollected())
+    if (!active && !isCollected()) {
         p.collectItem(this);
+    }
     return true;
 }
 
+// === Countdown Update ===
 bool Bomb::tick()
 {
-    if (!active) return false;
-    if (getX() < 0 || getY() < 0) return false;
+    if (!active) {
+        return false;
+    }
+    if (getX() < 0 || getY() < 0) {
+        return false;
+    }
 
     // Visual countdown
-    if (ticksLeft > 16 && ticksLeft <= 24) setChar('3');
-    else if (ticksLeft > 8 && ticksLeft <= 16) setChar('2');
-    else if (ticksLeft > 0 && ticksLeft <= 8) setChar('1');
+    if (ticksLeft > 16 && ticksLeft <= 24) {
+        setChar('3');
+    }
+    else if (ticksLeft > 8 && ticksLeft <= 16) {
+        setChar('2');
+    }
+    else if (ticksLeft > 0 && ticksLeft <= 8) {
+        setChar('1');
+    }
 
     if (--ticksLeft <= 0)
     {
@@ -38,9 +53,12 @@ bool Bomb::tick()
     }
     return false;
 }
+
+// === Serialization ===
 std::string Bomb::getTypeName() const { return "BOMB"; }
 
-std::string Bomb::getSaveData() const {
+std::string Bomb::getSaveData() const
+{
     // Format: X Y Active(1/0) TicksLeft
     return GameObject::getSaveData() + " " + (active ? "1" : "0") + " " + std::to_string(ticksLeft);
 }
