@@ -3,7 +3,7 @@
 #include <cmath>
 
 // === Construction ===
-FileGame::FileGame(bool silentMode) : isSilent(silentMode) {}
+FileGame::FileGame(bool silentMode) : isSilent(silentMode) { soundEnabled = false; }
 
 FileGame::~FileGame()
 {

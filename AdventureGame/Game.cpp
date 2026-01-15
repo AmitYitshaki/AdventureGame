@@ -348,7 +348,7 @@ void Game::updateBombs()
             reportEvent("BOMB_EXPLODE", location);
             playSound(150, 150); // Now async!
             Point c = bomb->getPoint();
-            int radius = Bomb::getExplosionRadius();
+            constexpr int radius = Bomb::getExplosionRadius();
             visualizeExplosion(c.getX(), c.getY(), radius);
             applyBombEffects(c.getX(), c.getY(), *currentScreen, radius);
             if (pendingRestart || exitToMainMenu) return;
@@ -685,7 +685,7 @@ void Game::gameOverScreen(const std::string& message)
     reportEvent("GAME_OVER", message);
 
     playSound(100, 600);
-    system("cls");
+	cls();
     if (!isSilentMode()) {
         const int BOX_WIDTH = 50;
         const int BOX_HEIGHT = 9;
