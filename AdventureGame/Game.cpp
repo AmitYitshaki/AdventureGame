@@ -54,6 +54,7 @@ void Game::start()
         // 5. Time Management (Virtual) - Skipped in Silent Mode
         handleSleep();
     }
+	endSession();
     cls();
 }
 
@@ -151,7 +152,6 @@ void Game::handleInput()
         }
         else if (key == 'h' || key == 'H') {
             reportEvent("GAME_ENDED", "User Quit to Menu");
-            endSession();
             goToScreen(ScreenId::HOME);
             setStatusMessage("");
         }
@@ -678,7 +678,6 @@ void Game::pauseScreen()
 
         if (key == 'h' || key == 'H') {
             reportEvent("GAME_ENDED", "User Quit to Menu");
-            endSession();
             goToScreen(ScreenId::HOME);
             setStatusMessage("");
             return;
@@ -733,7 +732,6 @@ void Game::gameOverScreen(const std::string& message)
         // [H] Exit to Main Menu
         else if (key == 'H' || key == 'h') {
             reportEvent("GAME_ENDED", "User Quit from Game Over");
-            endSession();
             exitToMainMenu = true;
             return;
         }

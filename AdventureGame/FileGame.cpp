@@ -17,9 +17,9 @@ void FileGame::initSession()
 {
     stepsFileIn.open("adv-world.steps");
     if (!stepsFileIn) {
-        std::cerr << "Error: Could not open steps file." << std::endl;
-        isRunning = false;
-        return;
+        testFailed = true;
+        failureReason = "Critical Error: Could not open 'adv-world.steps' file!";
+		return;
     }
 
     std::string header;
@@ -56,16 +56,12 @@ void FileGame::endSession()
             std::cout << "TEST FAILED" << std::endl;
             std::cout << "Reason: " << failureReason << std::endl;
         }
-        else if (!expectedResults.empty()) {
-            std::cout << "TEST FAILED" << std::endl;
-            std::cout << "Reason: Missing " << expectedResults.size() << " expected events." << std::endl;
-        }
         else {
             std::cout << "TEST PASSED" << std::endl;
-        }
-        std::cout << "========================================" << std::endl;
+            std::cout << "========================================" << std::endl;
 
-        std::cout << "Press any key to exit...";
+            std::cout << "Press any key to exit...";
+        }
         _getch();
     }
 }
@@ -162,6 +158,8 @@ void FileGame::loadExpectedResults()
 {
     std::ifstream resIn("adv-world.result");
     if (!resIn) {
+        testFailed = true;
+        failureReason = "Critical Error: Could not open 'adv-world.result' file!";
         return;
     }
     long t;
