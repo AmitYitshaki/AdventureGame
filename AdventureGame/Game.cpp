@@ -138,11 +138,17 @@ void Game::handleInput()
             if (isSoundEnabled()) playSound(400, 100);
             return;
         }
+        if(key == 27) {//disable ESC on Main menu screen to avoid confusion
+            return;
+		}
     }
 
     // Exit from Special Screens (Instructions / End Game)
     if (currentScreen->getScreenId() == ScreenId::ROOM4 || currentScreen->getScreenId() == ScreenId::INSTRUCTIONS) {
         if (key == '1' && currentScreen->getScreenId() == ScreenId::ROOM4) { resetGame(); }
+		if (key == 27) { //disable ESC on instructions screen to avoid confusion
+            return;
+        }
         else if (key == 'h' || key == 'H') {
             reportEvent("GAME_ENDED", "User Quit to Menu");
             endSession();
@@ -178,7 +184,7 @@ void Game::resetGame()
     RiddleMode = false;
     currentRiddle = nullptr;
     setStatusMessage("");
-
+    cycleCounter = 0;
     for (auto obj : gameObjects) delete obj;
     gameObjects.clear();
 
@@ -638,7 +644,7 @@ void Game::pauseScreen()
     if (!isSilentMode()) {
         gotoxy(x, y);     std::cout << "*************************************";
         gotoxy(x, y + 1); std::cout << "* GAME PAUSED                       *";
-        gotoxy(x, y + 2); std::cout << "* *";
+        gotoxy(x, y + 2); std::cout << "*                                   *";
         gotoxy(x, y + 3); std::cout << "* [ESC] Continue                    *";
         gotoxy(x, y + 4); std::cout << "* [S]   Save Current State          *";
         gotoxy(x, y + 5); std::cout << "* [H]   Exit to Main Menu           *";
