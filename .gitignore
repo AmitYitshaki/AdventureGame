@@ -33,3 +33,7 @@ Release/
 *.a
 *.lai
 *.la
+
+# --- Local artifacts / archives ---
+AdventureGame.zip
+AdventureGame/savegame.sav
