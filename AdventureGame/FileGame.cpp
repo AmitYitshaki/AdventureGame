@@ -58,11 +58,8 @@ void FileGame::endSession()
         }
         else {
             std::cout << "TEST PASSED" << std::endl;
-            std::cout << "========================================" << std::endl;
-
-            std::cout << "Press any key to exit...";
         }
-        _getch();
+        std::cout << "========================================" << std::endl;
     }
 }
 

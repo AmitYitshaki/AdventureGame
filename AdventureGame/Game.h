@@ -65,6 +65,10 @@ public:
     // Main entry point to start the game loop
     void start();
 
+    // Lets main() report a non-zero exit code when a scripted/verification
+    // run (FileGame) detected a mismatch, so CI can fail the build on it.
+    virtual bool hadFailure() const { return false; }
+
     // Static accessors for global functionality
     static void playSound(int frequency, int duration);
     static void setStatusMessage(const std::string& msg);
@@ -251,6 +255,8 @@ class FileGame : public Game
 public:
     FileGame(bool silentMode = false);
     virtual ~FileGame();
+
+    virtual bool hadFailure() const override { return testFailed; }
 
 protected:
     // Virtual Implementations

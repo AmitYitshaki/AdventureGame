@@ -1,0 +1,76 @@
+name: Build and test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build-and-test:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Add MSBuild to PATH
+        uses: microsoft/setup-msbuild@v2
+
+      - name: Build (Debug|x64)
+        run: msbuild AdventureGame/AdventureGame.sln /p:Configuration=Debug /p:Platform=x64 /m
+
+      - name: Locate built executable
+        id: locate
+        shell: pwsh
+        run: |
+          $exe = Get-ChildItem -Path AdventureGame -Recurse -Filter "adv-world.exe" |
+            Select-Object -First 1
+          if (-not $exe) {
+            $exe = Get-ChildItem -Path AdventureGame -Recurse -Filter "AdventureGame.exe" |
+              Select-Object -First 1
+          }
+          if (-not $exe) {
+            throw "Could not find the built executable."
+          }
+          Write-Host "Found executable: $($exe.FullName)"
+          "exeDir=$($exe.DirectoryName)" >> $env:GITHUB_OUTPUT
+          "exePath=$($exe.FullName)" >> $env:GITHUB_OUTPUT
+
+      # Each ExampleRuns/<scenario> folder holds a recorded adv-world.steps
+      # (inputs) and adv-world.result (expected events). Replaying it in
+      # -load -silent mode re-runs the scenario headlessly and verifies
+      # actual events against the recording; the process exits 1 on any
+      # mismatch or timeout.
+      - name: Run recorded scenarios (regression tests)
+        shell: pwsh
+        run: |
+          $exeDir = "${{ steps.locate.outputs.exeDir }}"
+          $exePath = "${{ steps.locate.outputs.exePath }}"
+          $scenarios = Get-ChildItem -Path "AdventureGame/ExampleRuns" -Directory
+          if ($scenarios.Count -eq 0) {
+            throw "No scenarios found under AdventureGame/ExampleRuns."
+          }
+
+          $failed = $false
+          foreach ($scenario in $scenarios) {
+            Write-Host "=== Scenario: $($scenario.Name) ==="
+            Copy-Item (Join-Path $scenario.FullName "adv-world.steps") (Join-Path $exeDir "adv-world.steps") -Force
+            Copy-Item (Join-Path $scenario.FullName "adv-world.result") (Join-Path $exeDir "adv-world.result") -Force
+
+            Push-Location $exeDir
+            & $exePath -load -silent
+            $exitCode = $LASTEXITCODE
+            Pop-Location
+
+            if ($exitCode -ne 0) {
+              Write-Host "::error::Scenario '$($scenario.Name)' FAILED (exit code $exitCode)"
+              $failed = $true
+            } else {
+              Write-Host "Scenario '$($scenario.Name)' passed."
+            }
+          }
+
+          if ($failed) {
+            throw "One or more recorded scenarios failed."
+          }
