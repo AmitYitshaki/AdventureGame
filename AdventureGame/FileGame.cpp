@@ -58,11 +58,8 @@ void FileGame::endSession()
         }
         else {
             std::cout << "TEST PASSED" << std::endl;
-            std::cout << "========================================" << std::endl;
-
-            std::cout << "Press any key to exit...";
         }
-        _getch();
+        std::cout << "========================================" << std::endl;
     }
 }
 
@@ -71,7 +68,7 @@ char FileGame::getNextChar()
 {
     // 1) Check whether there are queued inputs for this cycle.
     if (playbackIndex < stepsBuffer.size()) {
-        if (stepsBuffer[playbackIndex].first <= cycleCounter) {
+        if (stepsBuffer[playbackIndex].first <= static_cast<long>(cycleCounter)) {
             return stepsBuffer[playbackIndex++].second;
         }
     }

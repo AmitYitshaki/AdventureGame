@@ -1,4 +1,4 @@
-Student id: 322819483 Amit Yitshaki, 208296715 Niv Katz
+Authors: Amit Yitshaki, Niv Katz
 
 =============================================================
               ADVENTURE GAME - PROJECT SUMMARY

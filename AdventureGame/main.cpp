@@ -26,6 +26,7 @@ int main(int argc, char* argv[])
 
     game->start();
 
+    bool failed = game->hadFailure();
     delete game;
-    return 0;
+    return failed ? 1 : 0;
 }
