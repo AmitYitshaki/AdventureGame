@@ -68,7 +68,7 @@ char FileGame::getNextChar()
 {
     // 1) Check whether there are queued inputs for this cycle.
     if (playbackIndex < stepsBuffer.size()) {
-        if (stepsBuffer[playbackIndex].first <= cycleCounter) {
+        if (stepsBuffer[playbackIndex].first <= static_cast<long>(cycleCounter)) {
             return stepsBuffer[playbackIndex++].second;
         }
     }
