@@ -1,8 +1,45 @@
 # AdventureGame
 
+[![Build and test](https://github.com/AmitYitshaki/AdventureGame/actions/workflows/build-and-test.yml/badge.svg)](https://github.com/AmitYitshaki/AdventureGame/actions/workflows/build-and-test.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
 A two-player, C++ console adventure game for Windows, built around a data-driven level format and a record/replay engine used for automated regression testing.
 
 Originally built as a three-part C++ course project (MTA), then extended with CI and cleanup for portfolio use.
+
+## Preview
+
+Levels are plain-text maps (`.screen` files) parsed at load time — this is Room 1 exactly as it ships (`#` walls, `K`/`1` a key and its door, `W` springs, `@`/`?` puzzle pieces):
+
+```
+L###############################################################################
+#                        #                        #                            #
+#                        #                        #                            #
+#                   /    #                        #      K                     #
+#   &                    #                        #                            #
+#   $                    #           @            #                            #
+#                        #           @            #                            #
+#                        #                        #                            #
+#------------------------#                        #                            #
+#                        #                        #                            #
+#                        #                        #                **###########
+#                        #----------------------**#              @ **     ?    1
+#                        |                        #                  ###########
+#                 **     |                        #                            #
+#                        |                        #                            #
+#                        |                        #                            #
+#                        |                        #                            #
+#                        |                        #                            #
+#                        |                        #                            #
+#                 **     |                        #                            #
+#W                **     |                        #                            #
+#                        |                        #                            #
+#                        |                        #                            #
+#          /             |         /              #                W           #
+################################################################################
+```
+
+*(Want a real gameplay GIF here instead? Build and run `adv-world.exe`, record a clip, and drop it in — happy to wire it into the README.)*
 
 ## Features
 
@@ -57,6 +94,10 @@ adv-world.exe -load -silent   # replays as fast as possible, no rendering, print
 - Game entities are owned via raw `new`/`delete` (`std::vector<GameObject*>`) rather than smart pointers.
 - Console I/O (`windows.h`/`conio.h`) is used directly in the engine rather than behind an abstraction, so the game is Windows-only.
 - No unit tests below the full-scenario replay level yet.
+
+## License
+
+MIT — see [LICENSE](LICENSE).
 
 ## Credits
 
