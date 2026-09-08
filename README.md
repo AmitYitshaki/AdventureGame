@@ -5,8 +5,6 @@
 
 A two-player, C++ console adventure game for Windows, built around a data-driven level format and a record/replay engine used for automated regression testing.
 
-Originally built as a three-part C++ course project (MTA), then extended with CI and cleanup for portfolio use.
-
 ## Preview
 
 Levels are plain-text maps (`.screen` files) parsed at load time — this is Room 1 exactly as it ships (`#` walls, `K`/`1` a key and its door, `W` springs, `@`/`?` puzzle pieces):
